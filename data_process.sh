@@ -30,9 +30,11 @@ mv ${data_folder}tdc_cal.csv ${raw_folder}tdc_cal.csv
 # Go into tutorial directory to use the parameter files:
 cd $folder_with_paramfiles
 # Convert raw data in more readale format:
-sfr-convert -u all ${raw_folder} ${converted_folder} --verbose
+echo "Converting the root file..."
+sfr-convert -u all ${raw_folder} ${converted_folder}${run_name} --verbose
 
 # Reconstruct tracks:
+echo "Reconstructing the tracks..."
 sfr-reconstruct -u 3d ${converted_folder}${run_name}.root ${reconstructed_folder}${run_name} --verbose
 
 # Go back in initial folder:
