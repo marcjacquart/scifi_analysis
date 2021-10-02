@@ -57,4 +57,3 @@ if True:
             binsTab = [np.linspace(0,n_channels-1,n_channels),
                 np.linspace(0,8,101)],
             axis_labels = ['Channel number','Value','Number of hits'])
-        
