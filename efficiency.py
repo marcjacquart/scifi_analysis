@@ -28,7 +28,7 @@ import rootUtils as ut
 import SndlhcGeo
 
 # Custom functions defined in external file:
-from analysisFunctions import goodEvent
+from analysisFunctions import goodEvent, valueToColor
 
 
 # Paths+name of the data and geometry root files passed to the script as
@@ -46,9 +46,9 @@ geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
 #Global variables definitions:
 lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
 lsOfGlobals.Add(geo.modules['Scifi'])
-#lsOfGlobals.Add(geo.modules['MuFilter'])
+# Don't need the Digi_MuFilterHit because we only look at SciFi events.
+# lsOfGlobals.Add(geo.modules['MuFilter'])
 
-# Don't need the Digi_MuFilterHit ?????
 
 # Extract the TTree: rawConv is the name of the tree in the root file
 eventTree = rootFile.rawConv
@@ -73,56 +73,78 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 #       - @size
 #   - Digi_MuFilterHit which is empty due to only SciFi being tested here.
 lenForHist=[]
+
+nMax = 100
+n=0
+offset=[47.8,-15.3,16.5]
 for sTree in eventTree: # sTree == single tree for one event?
-    digis = []
-    if sTree.FindBranch("Digi_ScifiHits"): 
-        digis.append(sTree.Digi_ScifiHits) # Digi_ScifiHits is a branch
-        lenForHist.append(len(sTree.Digi_ScifiHits))
-    if sTree.FindBranch("EventHeader"):
-        T = sTree.EventHeader.GetEventTime()
-    for D in digis:
-        aTab = []
-        bTab = []
-        for hit in D:
-            A,B = ROOT.TVector3(),ROOT.TVector3()
-            detID = hit.GetDetectorID()
-            geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
-            A = [A[0], A[1], A[2]]
-            B = [B[0], B[1], B[2]]
-            aTab.append(A)            
-            bTab.append(B)
-
-        fig= plt.figure(figsize = (10, 7))
-        ax = plt.axes(projection="3d")
+    n += 1
+    if n < nMax:
+        digis = []
+        if sTree.FindBranch("Digi_ScifiHits"): 
+            digis.append(sTree.Digi_ScifiHits) # Digi_ScifiHits is a branch
+            lenForHist.append(len(sTree.Digi_ScifiHits))
+        if sTree.FindBranch("EventHeader"):
+            T = sTree.EventHeader.GetEventTime()
         
+        tabPosStart = []
+        tabPosStop = []
+        for D in digis:
+            
+            for hit in D:
+                # A: beginning, B: end of the scintillating bar?
+                A,B = ROOT.TVector3(),ROOT.TVector3()
+                detID = hit.GetDetectorID()
+                geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
+                # Purpose of hit.isVertical() ???
+                sipmPosStart = [A[0] + offset[0], A[1] + offset[1], A[2] + offset[2]]
+                sipmPosStop = [B[0] + offset[0], B[1] + offset[1], B[2] + offset[2]]
+                # print(A)
+                # print(B)
+                # print('---')
+                tabPosStart.append(sipmPosStart)            
+                tabPosStop.append(sipmPosStop)
 
-        ax.scatter3D(
-            xs = [x[0] for x in aTab], # /!\ [:,0] notation is only ok for np arrays. else use [x[0] for x in aTab]
-            ys = [x[1] for x in aTab],
-            zs = [x[2] for x in aTab],
-            color = 'b',
-            label = 'A')
-        ax.scatter3D(
-            xs = [x[0] for x in bTab],
-            ys = [x[1] for x in bTab],
-            zs = [x[2] for x in bTab],
-            color = 'r',
-            label = 'B')
-        plt.legend()
-        plt.show()
-        plt.close()
-    print(f'---------------------------------------------------')
-
-#print(f'len(digis)={len(digis)}')
-
-
-# for D in digis: # D: TClonesArray
-#     # print(f'len(D)={len(D)}')
-#     # print(f'---------------------------------------------------')
-#     for hit in D:
-#         #print(f'len(digi)={len(digi)}')
-#         detID = hit.GetDetectorID()
-#         # print(digi)
-#         geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
+            fig= plt.figure(figsize = (10, 7))
+            ax = plt.axes(projection="3d")
+            print('----------------------------------')
+            print(f'Number of hits: {len(tabPosStart)}')
+            for hitNumber in range(len(tabPosStart)):
+                ax.plot(
+                    xs = [tabPosStart[hitNumber][0], tabPosStop[hitNumber][0]], 
+                    ys = [tabPosStart[hitNumber][1], tabPosStop[hitNumber][1]],
+                    zs = [tabPosStart[hitNumber][2], tabPosStop[hitNumber][2]],
+                    ls = '-',
+                    # RGB format to color different Scifi planes
+                    color = valueToColor(abs(tabPosStart[hitNumber][2])) )
+            ax.set_xlabel('x [cm]')
+            ax.set_ylabel('y [cm]')
+            ax.set_zlabel('z [cm]')
+            plt.show()
+            plt.close()
 
 
+
+
+# 3d scatter plot code:
+if False:
+    fig= plt.figure(figsize = (10, 7))
+    ax = plt.axes(projection="3d")
+
+    
+    ax.scatter3D(
+        xs = [x[0] for x in tabPosStart], 
+        ys = [x[1] for x in tabPosStart],
+        zs = [x[2] for x in tabPosStart],
+        color = 'b',
+        label = 'A')
+    # [:,0] notation is only for np arrays. else use [x[0] for x in tabPosStart]
+    ax.scatter3D(
+        xs = [x[0] for x in tabPosStop],
+        ys = [x[1] for x in tabPosStop],
+        zs = [x[2] for x in tabPosStop],
+        color = 'r',
+        label = 'B')
+    plt.legend()
+    plt.show()
+    plt.close()
