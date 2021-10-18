@@ -26,6 +26,7 @@ import rootUtils as ut
 # SND:
 #import shipunit as u
 import SndlhcGeo
+import SndlhcTracking
 
 # Custom functions defined in external file:
 from analysisFunctions import goodEvent, valueToColor
@@ -53,6 +54,9 @@ lsOfGlobals.Add(geo.modules['Scifi'])
 # Extract the TTree: rawConv is the name of the tree in the root file
 eventTree = rootFile.rawConv
 
+# Setup tracking:
+trackTask = SndlhcTracking.Tracking() 
+trackTask.InitTask(eventTree)
 
 # GetCurrentNavigator() Returns current navigator for the calling thread. 
 # A navigator is a class providing navigation API for TGeo geometries.
@@ -72,56 +76,50 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 #       - ly_loss_params
 #       - @size
 #   - Digi_MuFilterHit which is empty due to only SciFi being tested here.
-lenForHist=[]
+lenForHist = []
 
-nMax = 100
-n=0
-offset=[47.8,-15.3,16.5]
-for sTree in eventTree: # sTree == single tree for one event?
-    n += 1
-    if n < nMax:
-        digis = []
-        if sTree.FindBranch("Digi_ScifiHits"): 
-            digis.append(sTree.Digi_ScifiHits) # Digi_ScifiHits is a branch
-            lenForHist.append(len(sTree.Digi_ScifiHits))
-        if sTree.FindBranch("EventHeader"):
-            T = sTree.EventHeader.GetEventTime()
-        
-        tabPosStart = []
-        tabPosStop = []
-        for D in digis:
-            
-            for hit in D:
-                # A: beginning, B: end of the scintillating bar?
-                A,B = ROOT.TVector3(),ROOT.TVector3()
-                detID = hit.GetDetectorID()
-                geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
-                # Purpose of hit.isVertical() ???
-                sipmPosStart = [A[0] + offset[0], A[1] + offset[1], A[2] + offset[2]]
-                sipmPosStop = [B[0] + offset[0], B[1] + offset[1], B[2] + offset[2]]
-                # print(A)
-                # print(B)
-                # print('---')
-                tabPosStart.append(sipmPosStart)            
-                tabPosStop.append(sipmPosStop)
 
-            fig= plt.figure(figsize = (10, 7))
-            ax = plt.axes(projection="3d")
-            print('----------------------------------')
-            print(f'Number of hits: {len(tabPosStart)}')
-            for hitNumber in range(len(tabPosStart)):
-                ax.plot(
-                    xs = [tabPosStart[hitNumber][0], tabPosStop[hitNumber][0]], 
-                    ys = [tabPosStart[hitNumber][1], tabPosStop[hitNumber][1]],
-                    zs = [tabPosStart[hitNumber][2], tabPosStop[hitNumber][2]],
-                    ls = '-',
-                    # RGB format to color different Scifi planes
-                    color = valueToColor(abs(tabPosStart[hitNumber][2])) )
-            ax.set_xlabel('x [cm]')
-            ax.set_ylabel('y [cm]')
-            ax.set_zlabel('z [cm]')
-            plt.show()
-            plt.close()
+offset = ROOT.TVector3(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
+for sTree in eventTree: # sTree == single tree for one event
+    # digis = []
+    # if sTree.FindBranch("Digi_ScifiHits"): 
+    #     digis.append(sTree.Digi_ScifiHits) # Digi_ScifiHits is a branch
+    #     lenForHist.append(len(sTree.Digi_ScifiHits))
+    # if sTree.FindBranch("EventHeader"):
+    #     T = sTree.EventHeader.GetEventTime()
+    
+    tabPosStart = []
+    tabPosStop = []
+
+    for hit in sTree.Digi_ScifiHits: 
+        # A: beginning, B: end of the activated scintillating bar
+        A,B = ROOT.TVector3(),ROOT.TVector3()
+        detID = hit.GetDetectorID()
+        geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
+        # hit.isVertical(): True if vertical fibers measuring x coord
+        sipmPosStart = A + offset
+        sipmPosStop = B + offset
+
+        tabPosStart.append(sipmPosStart)            
+        tabPosStop.append(sipmPosStop)
+
+    fig= plt.figure(figsize = (10, 7))
+    ax = plt.axes(projection="3d")
+    print('----------------------------------')
+    print(f'Number of hits: {len(tabPosStart)}')
+    for hitNumber in range(len(tabPosStart)):
+        ax.plot(
+            xs = [tabPosStart[hitNumber][0], tabPosStop[hitNumber][0]], 
+            ys = [tabPosStart[hitNumber][1], tabPosStop[hitNumber][1]],
+            zs = [tabPosStart[hitNumber][2], tabPosStop[hitNumber][2]],
+            ls = '-',
+            # RGB format to color different Scifi planes
+            color = valueToColor(abs(tabPosStart[hitNumber][2])) )
+    ax.set_xlabel('x [cm]')
+    ax.set_ylabel('y [cm]')
+    ax.set_zlabel('z [cm]')
+    plt.show()
+    plt.close()
 
 
 
