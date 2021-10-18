@@ -55,7 +55,7 @@ lsOfGlobals.Add(geo.modules['Scifi'])
 eventTree = rootFile.rawConv
 
 # Setup tracking:
-trackTask = SndlhcTracking.Tracking() 
+trackTask = SndlhcTracking.Tracking()
 trackTask.InitTask(eventTree)
 
 # GetCurrentNavigator() Returns current navigator for the calling thread. 
@@ -87,42 +87,66 @@ for sTree in eventTree: # sTree == single tree for one event
     #     lenForHist.append(len(sTree.Digi_ScifiHits))
     # if sTree.FindBranch("EventHeader"):
     #     T = sTree.EventHeader.GetEventTime()
+
+    # scifiCluster() only works when in the loop O_o
+    clusterArr = trackTask.scifiCluster() # Warning: cluster type sndCluster
+    print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
+        + f'into {len(clusterArr)} clusters.')
+
+
+    trackTask.ExecuteTask()
+    print(trackTask.event.fittedTracks)
     
-    tabPosStart = []
-    tabPosStop = []
+            
 
-    for hit in sTree.Digi_ScifiHits: 
-        # A: beginning, B: end of the activated scintillating bar
+    arrPosStart = []
+    arrPosStop = []
+    for cluster in clusterArr:
+        # A: beginning, B: end of the activated scintillating bar.
         A,B = ROOT.TVector3(),ROOT.TVector3()
-        detID = hit.GetDetectorID()
-        geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
-        # hit.isVertical(): True if vertical fibers measuring x coord
-        sipmPosStart = A + offset
-        sipmPosStop = B + offset
-
-        tabPosStart.append(sipmPosStart)            
-        tabPosStop.append(sipmPosStop)
-
+        cluster.GetPosition(A,B) # Fill A and B directly with position.
+        # hit.isVertical(): True if vertical fibers measuring x coord.
+        
+        # Apply offset and put in array
+        arrPosStart.append(A + offset)            
+        arrPosStop.append(B + offset)
     fig= plt.figure(figsize = (10, 7))
     ax = plt.axes(projection="3d")
-    print('----------------------------------')
-    print(f'Number of hits: {len(tabPosStart)}')
-    for hitNumber in range(len(tabPosStart)):
+
+    for hitNumber in range(len(arrPosStart)):
         ax.plot(
-            xs = [tabPosStart[hitNumber][0], tabPosStop[hitNumber][0]], 
-            ys = [tabPosStart[hitNumber][1], tabPosStop[hitNumber][1]],
-            zs = [tabPosStart[hitNumber][2], tabPosStop[hitNumber][2]],
+            xs = [arrPosStart[hitNumber][0], arrPosStop[hitNumber][0]], 
+            ys = [arrPosStart[hitNumber][1], arrPosStop[hitNumber][1]],
+            zs = [arrPosStart[hitNumber][2], arrPosStop[hitNumber][2]],
             ls = '-',
             # RGB format to color different Scifi planes
-            color = valueToColor(abs(tabPosStart[hitNumber][2])) )
+            color = valueToColor(abs(arrPosStart[hitNumber][2])) )
+    # Fit infos
+    fitArr = []
+    for aTrack in trackTask.event.fittedTracks:
+        for i in range(aTrack.getNumPointsWithMeasurement()):
+            state = aTrack.getFittedState(i)
+            pos = state.getPos() + offset
+            fitArr.append(pos)
+
+    ax.plot(
+        xs = [element[0] for element in fitArr], 
+        ys = [element[1] for element in fitArr],
+        zs = [element[2] for element in fitArr],
+        color = 'r',
+        label = 'fit')
     ax.set_xlabel('x [cm]')
     ax.set_ylabel('y [cm]')
     ax.set_zlabel('z [cm]')
+    plt.legend()
     plt.show()
     plt.close()
 
 
 
+
+
+# ---------- end of script ------------
 
 # 3d scatter plot code:
 if False:
@@ -131,18 +155,23 @@ if False:
 
     
     ax.scatter3D(
-        xs = [x[0] for x in tabPosStart], 
-        ys = [x[1] for x in tabPosStart],
-        zs = [x[2] for x in tabPosStart],
+        xs = [x[0] for x in arrPosStart], 
+        ys = [x[1] for x in arrPosStart],
+        zs = [x[2] for x in arrPosStart],
         color = 'b',
         label = 'A')
-    # [:,0] notation is only for np arrays. else use [x[0] for x in tabPosStart]
+    # [:,0] notation is only for np arrays. else use [x[0] for x in arrPosStart]
     ax.scatter3D(
-        xs = [x[0] for x in tabPosStop],
-        ys = [x[1] for x in tabPosStop],
-        zs = [x[2] for x in tabPosStop],
+        xs = [x[0] for x in arrPosStop],
+        ys = [x[1] for x in arrPosStop],
+        zs = [x[2] for x in arrPosStop],
         color = 'r',
         label = 'B')
     plt.legend()
     plt.show()
     plt.close()
+
+    # Position of the single hits before clustering:
+    for hit in sTree.Digi_ScifiHits:
+        detID = hit.GetDetectorID()
+        geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
