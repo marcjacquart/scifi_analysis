@@ -90,22 +90,22 @@ for sTree in eventTree: # sTree == single tree for one event
 
     # Chi2/nDOF to measure the fit (DOF: degrees of freedom of the fit)
     
-    print(clusterArr)
-    hitList = {}
-    for x in clusterArr:
-        
-        A,B = ROOT.TVector3(),ROOT.TVector3()
-        x.GetPosition(A,B)
-        clusterID = x.GetFirst()
-        #clusterid = x.fFirst
-        dictEntery = {clusterID: [A,B]}
-        hitList.update(dictEntery)
+    if goodEvent(eventTree = eventTree, nStations = 3, allowMore = False):
+        hitList = {}
+        for x in clusterArr:
+            A,B = ROOT.TVector3(),ROOT.TVector3()
+            x.GetPosition(A,B)
+            #print(x.GetFirst())
+            clusterID = x.GetFirst()
+            dictEntery = {clusterID: x} # [A,B]
+            hitList.update(dictEntery)
 
-    fittedTrack = trackTask.fitTrack(hitlist=hitList)
-    fitStatus   = fittedTrack.event.fittedTracks.getFitStatus()
-    chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
-    print(f'chi2: {chi2}')
-
+        fittedTrack = trackTask.fitTrack(hitlist=hitList)
+        fitStatus   = fittedTrack.getFitStatus()
+        chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
+        print(f'chi2: {chi2}')
+    else:
+        print('Bad event!')
     arrPosStart = []
     arrPosStop = []
     for cluster in clusterArr:
@@ -117,7 +117,7 @@ for sTree in eventTree: # sTree == single tree for one event
         # Apply offset and put in array
         arrPosStart.append(A + offset)            
         arrPosStop.append(B + offset)
-    if True: # Put True to display 3d trajectories
+    if False: # Put True to display 3d trajectories
         display3dTrack(
             arrPosStart = arrPosStart, 
             arrPosStop = arrPosStop, 

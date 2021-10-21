@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 
 
-def goodEvent(nStations, allowMore):
+def goodEvent(eventTree, nStations, allowMore):
     '''Return True if nStations (or more if allowMore) are hits in the event'''
 
     stations = {}
