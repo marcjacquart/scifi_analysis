@@ -13,10 +13,7 @@
 # Imports:
 # General
 from argparse import ArgumentParser
-#from array import array
 import os
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
 import numpy as np
 
 # Root:
@@ -24,12 +21,11 @@ import ROOT
 import rootUtils as ut
 
 # SND:
-#import shipunit as u
 import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import goodEvent, valueToColor
+from analysisFunctions import display3dTrack, goodEvent
 
 
 # Paths+name of the data and geometry root files passed to the script as
@@ -46,10 +42,7 @@ geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
 
 #Global variables definitions:
 lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
-lsOfGlobals.Add(geo.modules['Scifi'])
-# Don't need the Digi_MuFilterHit because we only look at SciFi events.
-# lsOfGlobals.Add(geo.modules['MuFilter'])
-
+lsOfGlobals.Add(geo.modules['Scifi']) # only look at SciFi events
 
 # Extract the TTree: rawConv is the name of the tree in the root file
 eventTree = rootFile.rawConv
@@ -63,8 +56,6 @@ trackTask.InitTask(eventTree)
 # Need it to browse trough the geometry files.
 nav = ROOT.gGeoManager.GetCurrentNavigator()
 
-
-# Loop on the event at the branchs level:
 # 3 branchs are in the data root file:
 #   - EventHeader with the following infos:
 #       - fEventTime about the time of the event (8e9 between pulses)
@@ -76,28 +67,44 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 #       - ly_loss_params
 #       - @size
 #   - Digi_MuFilterHit which is empty due to only SciFi being tested here.
-lenForHist = []
 
 
 offset = ROOT.TVector3(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
 for sTree in eventTree: # sTree == single tree for one event
-    # digis = []
-    # if sTree.FindBranch("Digi_ScifiHits"): 
-    #     digis.append(sTree.Digi_ScifiHits) # Digi_ScifiHits is a branch
-    #     lenForHist.append(len(sTree.Digi_ScifiHits))
-    # if sTree.FindBranch("EventHeader"):
-    #     T = sTree.EventHeader.GetEventTime()
-
-    # scifiCluster() only works when in the loop O_o
+    # scifiCluster() only works when in the loop O_o?
     clusterArr = trackTask.scifiCluster() # Warning: cluster type sndCluster
     print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
         + f'into {len(clusterArr)} clusters.')
 
-
-    trackTask.ExecuteTask()
-    print(trackTask.event.fittedTracks)
     
-            
+    trackTask.ExecuteTask()
+    # Clusters are stored in the list: trackTask.clusters
+    
+    # <sndCluster>.GetFirst() gives the first sipm channel number: STMRFFF
+    # First digit S:       station # within the sub-detector
+    # Second digit T:      type of the plane: 0-horizontal fiber plane, 
+    #                      1-vertical fiber plane
+    # Third digit M:       determines the mat number 0-2
+    # Fourth digit S:      SiPM number  0-3
+    # Last three digits F: local SiPM channel number in one mat  0-127
+
+    # Chi2/nDOF to measure the fit (DOF: degrees of freedom of the fit)
+    
+    print(clusterArr)
+    hitList = {}
+    for x in clusterArr:
+        
+        A,B = ROOT.TVector3(),ROOT.TVector3()
+        x.GetPosition(A,B)
+        clusterID = x.GetFirst()
+        #clusterid = x.fFirst
+        dictEntery = {clusterID: [A,B]}
+        hitList.update(dictEntery)
+
+    fittedTrack = trackTask.fitTrack(hitlist=hitList)
+    fitStatus   = fittedTrack.event.fittedTracks.getFitStatus()
+    chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
+    print(f'chi2: {chi2}')
 
     arrPosStart = []
     arrPosStop = []
@@ -110,68 +117,11 @@ for sTree in eventTree: # sTree == single tree for one event
         # Apply offset and put in array
         arrPosStart.append(A + offset)            
         arrPosStop.append(B + offset)
-    fig= plt.figure(figsize = (10, 7))
-    ax = plt.axes(projection="3d")
-
-    for hitNumber in range(len(arrPosStart)):
-        ax.plot(
-            xs = [arrPosStart[hitNumber][0], arrPosStop[hitNumber][0]], 
-            ys = [arrPosStart[hitNumber][1], arrPosStop[hitNumber][1]],
-            zs = [arrPosStart[hitNumber][2], arrPosStop[hitNumber][2]],
-            ls = '-',
-            # RGB format to color different Scifi planes
-            color = valueToColor(abs(arrPosStart[hitNumber][2])) )
-    # Fit infos
-    fitArr = []
-    for aTrack in trackTask.event.fittedTracks:
-        for i in range(aTrack.getNumPointsWithMeasurement()):
-            state = aTrack.getFittedState(i)
-            pos = state.getPos() + offset
-            fitArr.append(pos)
-
-    ax.plot(
-        xs = [element[0] for element in fitArr], 
-        ys = [element[1] for element in fitArr],
-        zs = [element[2] for element in fitArr],
-        color = 'r',
-        label = 'fit')
-    ax.set_xlabel('x [cm]')
-    ax.set_ylabel('y [cm]')
-    ax.set_zlabel('z [cm]')
-    plt.legend()
-    plt.show()
-    plt.close()
-
-
-
-
-
-# ---------- end of script ------------
-
-# 3d scatter plot code:
-if False:
-    fig= plt.figure(figsize = (10, 7))
-    ax = plt.axes(projection="3d")
-
+    if True: # Put True to display 3d trajectories
+        display3dTrack(
+            arrPosStart = arrPosStart, 
+            arrPosStop = arrPosStop, 
+            trackTask = trackTask,
+            offset = offset)
     
-    ax.scatter3D(
-        xs = [x[0] for x in arrPosStart], 
-        ys = [x[1] for x in arrPosStart],
-        zs = [x[2] for x in arrPosStart],
-        color = 'b',
-        label = 'A')
-    # [:,0] notation is only for np arrays. else use [x[0] for x in arrPosStart]
-    ax.scatter3D(
-        xs = [x[0] for x in arrPosStop],
-        ys = [x[1] for x in arrPosStop],
-        zs = [x[2] for x in arrPosStop],
-        color = 'r',
-        label = 'B')
-    plt.legend()
-    plt.show()
-    plt.close()
 
-    # Position of the single hits before clustering:
-    for hit in sTree.Digi_ScifiHits:
-        detID = hit.GetDetectorID()
-        geo.modules['Scifi'].GetSiPMPosition(detID,A,B)
