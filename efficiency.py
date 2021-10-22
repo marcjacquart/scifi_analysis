@@ -69,19 +69,41 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 #   - Digi_MuFilterHit which is empty due to only SciFi being tested here.
 
 
-offset = ROOT.TVector3(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
+zArr = [0,0,0,0,0,0,0,0,0,0] # Fill Z coordinate of the planes
+# format: [1hor, 1ver, 2hor, ...,5hor, 5ver]
+# /!\ THIS ASSUME Z FIX FOR ALL THE PLANE!
+# Warning message if z values > epsilon for different SiPM of same plane
+epsilon = 0.0001 
+for sTree in eventTree: # Need the first event with all planes hit:
+    if goodEvent(eventTree = eventTree, nStations = 5, allowMore = False):
+        A,B = ROOT.TVector3(),ROOT.TVector3()
+        for hit in sTree.Digi_ScifiHits:
+            hitID = hit.GetChannelID()
+            geo.modules['Scifi'].GetSiPMPosition(hitID,A,B)
+            indexArr = (hitID // 1000000-1) * 2  + (hitID // 100000) % 2
+            #           add 2 for each plane      add 1 if vertical
+
+            zVal = 0.5 * (A[2] + B[2])
+            #Will overwrite if event of same plane, good to check if same z.
+            if zArr[indexArr]!=0 and zArr[indexArr]-zVal>epsilon:
+                print(f'WARNING: SciFi planes {indexArr} not aligned in Z direction!')
+            zArr[indexArr] = zVal # Fill z array
+        break
+print(f'zArr: {zArr}')
+
+
+offset = ROOT.TVector3(0,0,0) #(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
 for sTree in eventTree: # sTree == single tree for one event
     # scifiCluster() only works when in the loop O_o?
     clusterArr = trackTask.scifiCluster() # Warning: cluster type sndCluster
-    print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
-        + f'into {len(clusterArr)} clusters.')
+    #print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
+    #    + f'into {len(clusterArr)} clusters.')
 
-    
     trackTask.ExecuteTask()
     # Clusters are stored in the list: trackTask.clusters
     
     # <sndCluster>.GetFirst() gives the first sipm channel number: STMRFFF
-    # First digit S:       station # within the sub-detector
+    # First digit S:       station # within the sub-detector 1-5
     # Second digit T:      type of the plane: 0-horizontal fiber plane, 
     #                      1-vertical fiber plane
     # Third digit M:       determines the mat number 0-2
@@ -95,33 +117,56 @@ for sTree in eventTree: # sTree == single tree for one event
         for x in clusterArr:
             A,B = ROOT.TVector3(),ROOT.TVector3()
             x.GetPosition(A,B)
-            #print(x.GetFirst())
+            
             clusterID = x.GetFirst()
-            dictEntery = {clusterID: x} # [A,B]
+            dictEntery = {clusterID: x}
             hitList.update(dictEntery)
 
+        # fittedTrack type: genfit::Track
         fittedTrack = trackTask.fitTrack(hitlist=hitList)
         fitStatus   = fittedTrack.getFitStatus()
-        chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
-        print(f'chi2: {chi2}')
-    else:
-        print('Bad event!')
-    arrPosStart = []
-    arrPosStop = []
-    for cluster in clusterArr:
-        # A: beginning, B: end of the activated scintillating bar.
-        A,B = ROOT.TVector3(),ROOT.TVector3()
-        cluster.GetPosition(A,B) # Fill A and B directly with position.
-        # hit.isVertical(): True if vertical fibers measuring x coord.
+        if fitStatus.getNdf() == 0.0:
+            # Perfect because no degree of freedom
+            # Put impossiblie chi2 -1 value to put them apart
+            chi2 = -1
+        else:
+            chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
         
-        # Apply offset and put in array
-        arrPosStart.append(A + offset)            
-        arrPosStop.append(B + offset)
-    if False: # Put True to display 3d trajectories
-        display3dTrack(
-            arrPosStart = arrPosStart, 
-            arrPosStop = arrPosStop, 
-            trackTask = trackTask,
-            offset = offset)
-    
+        #print(f'Fit points: {fittedTrack.getPoints()}')
+        #print(f'chi2: {chi2}')
 
+        fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
+        # for i in range(fittedTrack.getNumPointsWithMeasurement()):
+        # Only the first can be used, other hits give same line
+        state = fittedTrack.getFittedState(0)
+        pos = state.getPos()
+        mom = state.getMom()
+        # linear fit: pos + lambda * mom
+        for planeIndex in range(len(zArr)):
+            lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
+            fitHits[planeIndex] = pos + lambdaPlane * mom
+
+
+        arrPosStart = []
+        arrPosStop = []
+        for cluster in clusterArr:
+            # A: beginning, B: end of the activated scintillating bar.
+            A,B = ROOT.TVector3(),ROOT.TVector3()
+            cluster.GetPosition(A,B) # Fill A and B directly with position.
+            # hit.isVertical(): True if vertical fibers measuring x coord.
+            
+            # Apply offset and put in array
+            arrPosStart.append(A + offset)            
+            arrPosStop.append(B + offset)
+        if True: # Put True to display 3d trajectories
+            display3dTrack(
+                arrPosStart = arrPosStart, 
+                arrPosStop = arrPosStop, 
+                trackTask = trackTask,
+                offset = offset,
+                fitHits = fitHits)
+    
+    # Else if don't pass event selection with number station hit:
+    else:
+        # print('Bad event!')
+        pass

@@ -20,7 +20,7 @@ def goodEvent(eventTree, nStations, allowMore):
     return False
 
 
-def valueToColor(value, cmap_name='nipy_spectral', vmin=0, vmax=40):
+def valueToColor(value, cmap_name='nipy_spectral', vmin=-18, vmax=22):
     '''Colormap from z coordinate to distinguish between SciFi planes.'''
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     cmap = matplotlib.cm.get_cmap(cmap_name)
@@ -30,7 +30,7 @@ def valueToColor(value, cmap_name='nipy_spectral', vmin=0, vmax=40):
 
 
 
-def display3dTrack(arrPosStart, arrPosStop, trackTask, offset):
+def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     fig= plt.figure(figsize = (10, 7))
     ax = plt.axes(projection="3d")
 
@@ -57,6 +57,15 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset):
         zs = [element[2] for element in fitArr],
         color = 'r',
         label = 'fit')
+
+    ax.scatter3D(
+        xs = [hit[0] for hit in fitHits], 
+        ys = [hit[1] for hit in fitHits],
+        zs = [hit[2] for hit in fitHits],
+        color = 'b',
+        marker = '^',
+        label = 'fit-plane intersection')
+
     ax.set_xlabel('x [cm]')
     ax.set_ylabel('y [cm]')
     ax.set_zlabel('z [cm]')
