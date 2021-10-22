@@ -25,7 +25,7 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import display3dTrack, goodEvent
+from analysisFunctions import display3dTrack, goodEvent, crossAllPlanes
 
 
 # Paths+name of the data and geometry root files passed to the script as
@@ -91,7 +91,8 @@ for sTree in eventTree: # Need the first event with all planes hit:
         break
 print(f'zArr: {zArr}')
 
-
+eventIn = 0
+eventOut = 0
 offset = ROOT.TVector3(0,0,0) #(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
 for sTree in eventTree: # sTree == single tree for one event
     # scifiCluster() only works when in the loop O_o?
@@ -146,6 +147,11 @@ for sTree in eventTree: # sTree == single tree for one event
             lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
             fitHits[planeIndex] = pos + lambdaPlane * mom
 
+        if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
+            eventIn +=1
+        else:
+            eventOut +=1
+
 
         arrPosStart = []
         arrPosStop = []
@@ -158,7 +164,7 @@ for sTree in eventTree: # sTree == single tree for one event
             # Apply offset and put in array
             arrPosStart.append(A + offset)            
             arrPosStop.append(B + offset)
-        if True: # Put True to display 3d trajectories
+        if False: # Put True to display 3d trajectories
             display3dTrack(
                 arrPosStart = arrPosStart, 
                 arrPosStop = arrPosStop, 
@@ -170,3 +176,4 @@ for sTree in eventTree: # sTree == single tree for one event
     else:
         # print('Bad event!')
         pass
+print(f'Total events in: {eventIn}, total events out: {eventOut}')

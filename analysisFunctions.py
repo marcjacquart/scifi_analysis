@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
-
+import ROOT
 
 def goodEvent(eventTree, nStations, allowMore):
     '''Return True if nStations (or more if allowMore) are hits in the event'''
@@ -28,8 +28,44 @@ def valueToColor(value, cmap_name='nipy_spectral', vmin=-18, vmax=22):
     color = matplotlib.colors.rgb2hex(rgb)
     return color
 
+# first give the x limits
+def crossAllPlanes(fitHitsArr,geo, verbose=False):
+    isInside = True # Set to False if only once out of bounds
+    A,B = ROOT.TVector3(),ROOT.TVector3()
 
+    #First plane horizontal:
+    geo.modules['Scifi'].GetSiPMPosition(1000000,A,B)
+    if fitHitsArr[0][0]<B[0] or A[0]<fitHitsArr[0][0]:
+        isInside = False
+        if verbose:
+            print('first x border exceeded:')
+            print(f'{fitHitsArr[0][0]}<{B[0]} or {A[0]}<{fitHitsArr[0][0]}')
 
+    #First plane vertical:
+    geo.modules['Scifi'].GetSiPMPosition(1100000,A,B)
+    if fitHitsArr[1][1]<A[1] or B[1]<fitHitsArr[1][1]:
+        isInside = False
+        if verbose:
+            print('first y border exceeded')
+            print(f'{fitHitsArr[1][1]}<{A[1]} or {B[1]}<{fitHitsArr[1][1]}')
+
+    #Last plane horizontal:
+    geo.modules['Scifi'].GetSiPMPosition(5000000,A,B)
+    if fitHitsArr[8][0]<B[0] or A[0]<fitHitsArr[8][0]:
+        isInside = False
+        if verbose:
+            print('last x border exceeded')
+            print(f'{fitHitsArr[8][0]}<{B[0]} or {A[0]}<{fitHitsArr[8][0]}')
+
+    #Last plane vertical:
+    geo.modules['Scifi'].GetSiPMPosition(5100000,A,B)
+    if fitHitsArr[9][1]<A[1] or B[1]<fitHitsArr[9][1]:
+        isInside = False
+        if verbose:
+            print('last y border exceeded')
+            print(f'{fitHitsArr[9][1]}<{A[1]} or {B[1]}<{fitHitsArr[9][1]}')
+
+    return isInside
 def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     fig= plt.figure(figsize = (10, 7))
     ax = plt.axes(projection="3d")
