@@ -10,14 +10,35 @@ def goodEvent(eventTree, nStations, allowMore):
     for detectedHit in eventTree.Digi_ScifiHits:
         stations[detectedHit.GetDetectorID()//1000000] = 1
                
-    for detectedHit in eventTree.Digi_MuFilterHit:
-        plane = 100*(detectedHit.GetDetectorID()//1000)
-        stations[plane] = 1
+    # for detectedHit in eventTree.Digi_MuFilterHit:
+    #     plane = 100*(detectedHit.GetDetectorID()//1000)
+    #     stations[plane] = 1
     if allowMore:
         if len(stations) >= nStations: return True
     else:
         if len(stations) == nStations: return True
     return False
+
+def indexStationsHit(eventTree):
+    '''
+    return array [X_1,X_2,X_3,...] of planes hit.
+    X: 0-9 number of the plane hit. With same convention as zArr:
+    2 * (plane number-1) + 1 for vertical plane
+    i.e. plane 2 vertical would have number 3 here. 
+    '''
+
+    # Filling a dictionary allows overwritting to have one entery per plane.
+    stations = {} 
+    for detectedHit in eventTree.Digi_ScifiHits:
+        detID = detectedHit.GetDetectorID()
+        planeNumber = (detID // 1000000 - 1) * 2  + (detID // 100000) % 2
+        stations[detID//100000] = planeNumber
+    
+    # Fill array to return from dict values:
+    indexHitArr = [] 
+    for planeID in stations.values():
+        indexHitArr.append(planeID)
+    return indexHitArr
 
 
 def valueToColor(value, cmap_name='nipy_spectral', vmin=-18, vmax=22):
@@ -28,7 +49,7 @@ def valueToColor(value, cmap_name='nipy_spectral', vmin=-18, vmax=22):
     color = matplotlib.colors.rgb2hex(rgb)
     return color
 
-# first give the x limits
+
 def crossAllPlanes(fitHitsArr,geo, verbose=False):
     isInside = True # Set to False if only once out of bounds
     A,B = ROOT.TVector3(),ROOT.TVector3()

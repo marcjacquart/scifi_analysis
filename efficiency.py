@@ -25,7 +25,7 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import display3dTrack, goodEvent, crossAllPlanes
+from analysisFunctions import display3dTrack, goodEvent, crossAllPlanes, indexStationsHit
 
 
 # Paths+name of the data and geometry root files passed to the script as
@@ -113,7 +113,7 @@ for sTree in eventTree: # sTree == single tree for one event
 
     # Chi2/nDOF to measure the fit (DOF: degrees of freedom of the fit)
     
-    if goodEvent(eventTree = eventTree, nStations = 3, allowMore = False):
+    if goodEvent(eventTree = eventTree, nStations = 2, allowMore = True):
         hitList = {}
         for x in clusterArr:
             A,B = ROOT.TVector3(),ROOT.TVector3()
@@ -147,31 +147,40 @@ for sTree in eventTree: # sTree == single tree for one event
             lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
             fitHits[planeIndex] = pos + lambdaPlane * mom
 
-        if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
+        if not crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
             eventIn +=1
+            indexHitArr = indexStationsHit(eventTree = eventTree)
+            nPlanesMissed = 10-len(indexHitArr)
+
+            # hitsMissed = fitHits
+            # for index in indexHitArr:
+            #     # Remove the coordinate of the planes hit,
+            #     # only the coordinates of the missed hits remains.
+            #     hitsMissed[index] = ROOT.TVector3(-1.68283565985,-1,50)
+            # hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
+            # print(len(hitsMissed))
+
+            arrPosStart = []
+            arrPosStop = []
+            for cluster in clusterArr:
+                # A: beginning, B: end of the activated scintillating bar.
+                A,B = ROOT.TVector3(),ROOT.TVector3()
+                cluster.GetPosition(A,B) # Fill A and B directly with position.
+                # hit.isVertical(): True if vertical fibers measuring x coord.
+                
+                # Apply offset and put in array
+                arrPosStart.append(A + offset)            
+                arrPosStop.append(B + offset)
+            if True: # Put True to display 3d trajectories
+                
+                display3dTrack(
+                    arrPosStart = arrPosStart, 
+                    arrPosStop = arrPosStop, 
+                    trackTask = trackTask,
+                    offset = offset,
+                    fitHits = fitHits)
         else:
             eventOut +=1
-
-
-        arrPosStart = []
-        arrPosStop = []
-        for cluster in clusterArr:
-            # A: beginning, B: end of the activated scintillating bar.
-            A,B = ROOT.TVector3(),ROOT.TVector3()
-            cluster.GetPosition(A,B) # Fill A and B directly with position.
-            # hit.isVertical(): True if vertical fibers measuring x coord.
-            
-            # Apply offset and put in array
-            arrPosStart.append(A + offset)            
-            arrPosStop.append(B + offset)
-        if False: # Put True to display 3d trajectories
-            display3dTrack(
-                arrPosStart = arrPosStart, 
-                arrPosStop = arrPosStop, 
-                trackTask = trackTask,
-                offset = offset,
-                fitHits = fitHits)
-    
     # Else if don't pass event selection with number station hit:
     else:
         # print('Bad event!')
