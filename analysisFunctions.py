@@ -118,6 +118,16 @@ class HandlerColormap(HandlerBase):
 
 
 def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
+    '''
+    arrPosStart/stop: position of the activated fibers, A&B from the getPos() function
+    trackTask is the fit object from SndlhcTracking.Tracking()
+    offset to have nicer [0,40] coordinates, unused for now
+    fitHits to display individually the missed hits of the fit on the planes.
+
+    Uses matplotlib to display a 3d plot of the track, the fit and missing hits.
+
+    '''
+
     fig= plt.figure(figsize = (10, 7))
     ax = plt.axes(projection="3d")
 
@@ -192,3 +202,73 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     plt.close()
 
 
+def display2dTrack(arrPosStart,arrPosStop):
+    verStart = []
+    verStop = []
+    horStart = []
+    horStop = []
+
+    print('Verify cluster proxymity:')
+    for element in arrPosStart:
+        print(f'Start: x:{element[0]}, y:{element[1]}, z:{element[2]}')
+    print('---------------------------')
+    
+    epsilon = 0.00001
+    for i in range(len(arrPosStart)):
+        delta = arrPosStart[i] - arrPosStop[i]
+        print(f'Delta: x:{delta[0]}, y:{delta[1]}, z:{delta[2]}')
+        if delta[0] < epsilon: #/!\ Change the condition is geometry not aligned anymore.
+            verStart.append(arrPosStart[i])
+            verStop.append(arrPosStop[i])
+        elif delta[1] < epsilon:
+            horStart.append(arrPosStart[i])
+            horStop.append(arrPosStop[i])
+        else:
+            print('ERROR: fiber neither vertical nor horizontal!')
+            print('Check geometry alignment or change hor/ver conditions.')
+
+    fig, (ax1, ax2) = plt.subplots(2)
+    fig.set_size_inches(12, 8)
+    fig.suptitle(f'Track 2d projections',
+                 fontsize='x-large',
+                 fontweight='bold')
+
+    # z-x plane:
+    # Horizontal fibers are lines in this plane
+    for i in range(len(horStart)):
+        ax1.vlines(
+            x= horStart[i][2],
+            ymin = min(horStart[i][0],horStop[i][0]),
+            ymax = max(horStart[i][0],horStop[i][0]),
+            colors = 'b')
+
+    # Vertical lines are only points in this plane
+    ax1.scatter(
+        x=[point[2] for point in verStart],
+        y=[point[0] for point in verStart],
+        color = 'b',
+        marker = '.')
+
+    ax1.set_xlabel('z [cm]')
+    ax1.set_ylabel('x [cm]')
+
+    # y-z plane:
+    # Vertical fibers are lines in this plane
+    for i in range(len(verStart)):
+        ax2.vlines(
+            x= verStart[i][2],
+            ymin = min(verStart[i][1],verStop[i][1]),
+            ymax = max(verStart[i][1],verStop[i][1]),
+            colors = 'b')
+    # Horizontal lines are only points in this plane
+    ax2.scatter(
+        x=[point[2] for point in horStart],
+        y=[point[1] for point in horStart],
+        color = 'b',
+        marker = '.')
+
+    ax2.set_xlabel('z [cm]')
+    ax2.set_ylabel('y [cm]')
+
+    plt.show()
+    plt.close()

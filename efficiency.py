@@ -26,7 +26,8 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import display3dTrack, goodEvent, crossAllPlanes, indexStationsHit
+from analysisFunctions import (display3dTrack, goodEvent, 
+    crossAllPlanes, indexStationsHit, display2dTrack)
 
 
 # Paths+name of the data and geometry root files passed to the script as
@@ -173,13 +174,17 @@ for sTree in eventTree: # sTree == single tree for one event
                 arrPosStart.append(A + offset)            
                 arrPosStop.append(B + offset)
             if chi2_nDf>150: # display 3d trajectories with condition
-                
-                display3dTrack(
+                if False:
+                    display3dTrack(
+                        arrPosStart = arrPosStart, 
+                        arrPosStop = arrPosStop, 
+                        trackTask = trackTask,
+                        offset = offset,
+                        fitHits = hitsMissed)
+                display2dTrack(
                     arrPosStart = arrPosStart, 
-                    arrPosStop = arrPosStop, 
-                    trackTask = trackTask,
-                    offset = offset,
-                    fitHits = hitsMissed)
+                    arrPosStop = arrPosStop
+                    )
         else:
             # if hasn't cross al planes
             pass
