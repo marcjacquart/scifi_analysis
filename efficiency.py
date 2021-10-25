@@ -183,8 +183,9 @@ for sTree in eventTree: # sTree == single tree for one event
                         fitHits = hitsMissed)
                 display2dTrack(
                     arrPosStart = arrPosStart, 
-                    arrPosStop = arrPosStop
-                    )
+                    arrPosStop = arrPosStop,
+                    trackTask = trackTask,
+                    fitHits = hitsMissed)
         else:
             # if hasn't cross al planes
             pass

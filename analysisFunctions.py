@@ -117,6 +117,27 @@ class HandlerColormap(HandlerBase):
         return stripes
 
 
+def extendedFitArr(trackTask, fitHits):
+    '''
+    Put fit intersection with planes in an array.
+    Add by linear extrapolation the missing hits.
+    return the full array of 10 ROOT.TVector3().
+    '''
+
+    # Fit infos
+    fitArr = []
+    # trackTask.event.fittedTracks are filled with the fitTrack() function
+    for aTrack in trackTask.event.fittedTracks:
+        for i in range(aTrack.getNumPointsWithMeasurement()):
+            state = aTrack.getFittedState(i)
+            pos = state.getPos()
+            fitArr.append(pos)
+
+    # Extend the fit display to missed hits points:
+    for pos in fitHits:
+        fitArr.append(pos) 
+    return fitArr
+
 def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     '''
     arrPosStart/stop: position of the activated fibers, A&B from the getPos() function
@@ -125,7 +146,6 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     fitHits to display individually the missed hits of the fit on the planes.
 
     Uses matplotlib to display a 3d plot of the track, the fit and missing hits.
-
     '''
 
     fig= plt.figure(figsize = (10, 7))
@@ -139,19 +159,8 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
             ls = '-',
             # RGB format to color different Scifi planes
             color = valueToColor(abs(arrPosStart[hitNumber][2])) )
-    # Fit infos
-    fitArr = []
-    # trackTask.event.fittedTracks are filled with the fitTrack() function
-    for aTrack in trackTask.event.fittedTracks:
-        for i in range(aTrack.getNumPointsWithMeasurement()):
-            state = aTrack.getFittedState(i)
-            pos = state.getPos() + offset
-            fitArr.append(pos)
 
-    # Extend the fit display to missed hits points:
-    for pos in fitHits:
-        fitArr.append(pos)
-
+    fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
     ax.plot(
         xs = [element[0] for element in fitArr], 
         ys = [element[1] for element in fitArr],
@@ -202,21 +211,22 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     plt.close()
 
 
-def display2dTrack(arrPosStart,arrPosStop):
+def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
     verStart = []
     verStop = []
     horStart = []
     horStop = []
 
-    print('Verify cluster proxymity:')
+    #print('Verify cluster proxymity:')
     for element in arrPosStart:
-        print(f'Start: x:{element[0]}, y:{element[1]}, z:{element[2]}')
-    print('---------------------------')
+        pass
+        #print(f'Start: x:{element[0]}, y:{element[1]}, z:{element[2]}')
+    #print('---------------------------')
     
     epsilon = 0.00001
     for i in range(len(arrPosStart)):
         delta = arrPosStart[i] - arrPosStop[i]
-        print(f'Delta: x:{delta[0]}, y:{delta[1]}, z:{delta[2]}')
+        #print(f'Delta: x:{delta[0]}, y:{delta[1]}, z:{delta[2]}')
         if delta[0] < epsilon: #/!\ Change the condition is geometry not aligned anymore.
             verStart.append(arrPosStart[i])
             verStop.append(arrPosStop[i])
@@ -226,6 +236,9 @@ def display2dTrack(arrPosStart,arrPosStop):
         else:
             print('ERROR: fiber neither vertical nor horizontal!')
             print('Check geometry alignment or change hor/ver conditions.')
+
+
+    fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
 
     fig, (ax1, ax2) = plt.subplots(2)
     fig.set_size_inches(12, 8)
@@ -248,7 +261,13 @@ def display2dTrack(arrPosStart,arrPosStop):
         y=[point[0] for point in verStart],
         color = 'b',
         marker = '.')
-
+    # Add fit:
+    # Can use sort() only because it is a straight line
+    ax1.plot(
+        [vect[2] for vect in fitArr],
+        [vect[0] for vect in fitArr],
+        color = 'r',
+        label = 'Fit')
     ax1.set_xlabel('z [cm]')
     ax1.set_ylabel('x [cm]')
 
@@ -266,7 +285,11 @@ def display2dTrack(arrPosStart,arrPosStop):
         y=[point[1] for point in horStart],
         color = 'b',
         marker = '.')
-
+    ax2.plot(
+        [vect[2] for vect in fitArr],
+        [vect[1] for vect in fitArr],
+        color = 'r',
+        label = 'Fit')
     ax2.set_xlabel('z [cm]')
     ax2.set_ylabel('y [cm]')
 
