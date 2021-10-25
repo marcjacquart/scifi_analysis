@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 import ROOT
 
+# Custom legend:
+from matplotlib.patches import Rectangle
+from matplotlib.legend_handler import HandlerBase
+
 def goodEvent(eventTree, nStations, allowMore):
     '''Return True if nStations (or more if allowMore) are hits in the event'''
 
@@ -87,6 +91,32 @@ def crossAllPlanes(fitHitsArr,geo, verbose=False):
             print(f'{fitHitsArr[9][1]}<{A[1]} or {B[1]}<{fitHitsArr[9][1]}')
 
     return isInside
+
+
+
+
+class HandlerColormap(HandlerBase):
+    '''
+    Custom handles for cluster legend,
+    Adapted from stackoverflow.com/questions/55501860/
+    '''
+    def __init__(self, cmap, num_stripes=10, **kw):
+        HandlerBase.__init__(self, **kw)
+        self.cmap = cmap
+        self.num_stripes = num_stripes
+    def create_artists(self, legend, orig_handle, 
+                       xdescent, ydescent, width, height, fontsize, trans):
+        stripes = []
+        for i in range(self.num_stripes):
+            s = Rectangle([xdescent + i * width / self.num_stripes, ydescent], 
+                          width / self.num_stripes, 
+                          height, 
+                          fc=self.cmap((2 * i + 1) / (2 * self.num_stripes)), 
+                          transform=trans)
+            stripes.append(s)
+        return stripes
+
+
 def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
     fig= plt.figure(figsize = (10, 7))
     ax = plt.axes(projection="3d")
@@ -108,12 +138,16 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
             pos = state.getPos() + offset
             fitArr.append(pos)
 
+    # Extend the fit display to missed hits points:
+    for pos in fitHits:
+        fitArr.append(pos)
+
     ax.plot(
         xs = [element[0] for element in fitArr], 
         ys = [element[1] for element in fitArr],
         zs = [element[2] for element in fitArr],
-        color = 'r',
-        label = 'fit')
+        color = 'k',
+        label = 'Fit')
 
     ax.scatter3D(
         xs = [hit[0] for hit in fitHits], 
@@ -121,12 +155,40 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, offset, fitHits):
         zs = [hit[2] for hit in fitHits],
         color = 'b',
         marker = '^',
-        label = 'fit-plane intersection')
+        label = 'Missed hits')
 
     ax.set_xlabel('x [cm]')
     ax.set_ylabel('y [cm]')
     ax.set_zlabel('z [cm]')
-    plt.legend()
+    
+    # Legend fields before adding custom entery.
+    handles, labels = ax.get_legend_handles_labels()
+    #handler_map = matplotlib.legend.Legend.get_legend_handler_map()
+    handler_map = matplotlib.legend.Legend.get_default_handler_map()
+    # Define custom legend for cluster hits.
+    cmap = plt.cm.nipy_spectral_r
+    cmap_handles = [Rectangle((0, 0), 1, 1)]
+    handler_rainbow = dict(zip(cmap_handles, [HandlerColormap(cmap)]))
+    label_rainbow = ['Fiber clusters']
+
+    # Append new entery to legend and display it.
+    # handles.append(cmap_handles)
+    # labels.append(label_rainbow)
+
+    # handler_map.update(handler_rainbow)
+    legend1 = plt.legend(
+        loc = 'upper right',
+        handles = handles, 
+        labels = labels, 
+        handler_map = handler_map)
+    legend2 = plt.legend(
+        loc = 'upper left',
+        handles = cmap_handles, 
+        labels = label_rainbow, 
+        handler_map = handler_rainbow)
+    plt.gca().add_artist(legend1)
+    plt.gca().add_artist(legend2)
     plt.show()
     plt.close()
+
 

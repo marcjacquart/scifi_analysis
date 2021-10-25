@@ -15,6 +15,7 @@
 from argparse import ArgumentParser
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Root:
 import ROOT
@@ -74,6 +75,8 @@ zArr = [0,0,0,0,0,0,0,0,0,0] # Fill Z coordinate of the planes
 # /!\ THIS ASSUME Z FIX FOR ALL THE PLANE!
 # Warning message if z values > epsilon for different SiPM of same plane
 epsilon = 0.0001 
+chi2_nDfArr = [] # To fill for histogram
+nPlanesHit = []
 for sTree in eventTree: # Need the first event with all planes hit:
     if goodEvent(eventTree = eventTree, nStations = 5, allowMore = False):
         A,B = ROOT.TVector3(),ROOT.TVector3()
@@ -89,10 +92,9 @@ for sTree in eventTree: # Need the first event with all planes hit:
                 print(f'WARNING: SciFi planes {indexArr} not aligned in Z direction!')
             zArr[indexArr] = zVal # Fill z array
         break
-print(f'zArr: {zArr}')
+#print(f'zArr: {zArr}')
 
-eventIn = 0
-eventOut = 0
+
 offset = ROOT.TVector3(0,0,0) #(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
 for sTree in eventTree: # sTree == single tree for one event
     # scifiCluster() only works when in the loop O_o?
@@ -113,28 +115,27 @@ for sTree in eventTree: # sTree == single tree for one event
 
     # Chi2/nDOF to measure the fit (DOF: degrees of freedom of the fit)
     
-    if goodEvent(eventTree = eventTree, nStations = 2, allowMore = True):
+    if goodEvent(eventTree = eventTree, nStations = 4, allowMore = True):
+        # Put the event to the dict format to use fitTrack()
         hitList = {}
         for x in clusterArr:
             A,B = ROOT.TVector3(),ROOT.TVector3()
-            x.GetPosition(A,B)
-            
+            #x.GetPosition(A,B)
             clusterID = x.GetFirst()
             dictEntery = {clusterID: x}
             hitList.update(dictEntery)
-
-        # fittedTrack type: genfit::Track
-        fittedTrack = trackTask.fitTrack(hitlist=hitList)
+        fittedTrack = trackTask.fitTrack(hitlist=hitList) # type: genfit::Track
         fitStatus   = fittedTrack.getFitStatus()
         if fitStatus.getNdf() == 0.0:
-            # Perfect because no degree of freedom
+            # Perfect fit because no degree of freedom
             # Put impossiblie chi2 -1 value to put them apart
-            chi2 = -1
+            chi2_nDf = -1
         else:
-            chi2 = fitStatus.getChi2()/fitStatus.getNdf() 
-        
+            chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
+        chi2_nDfArr.append(chi2_nDf)
+        nPlanesHit.append(len(indexStationsHit(eventTree)))
         #print(f'Fit points: {fittedTrack.getPoints()}')
-        #print(f'chi2: {chi2}')
+        #print(f'chi2_nDf: {chi2_nDf}')
 
         fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
         # for i in range(fittedTrack.getNumPointsWithMeasurement()):
@@ -147,18 +148,18 @@ for sTree in eventTree: # sTree == single tree for one event
             lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
             fitHits[planeIndex] = pos + lambdaPlane * mom
 
-        if not crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
-            eventIn +=1
+        if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
             indexHitArr = indexStationsHit(eventTree = eventTree)
             nPlanesMissed = 10-len(indexHitArr)
 
-            # hitsMissed = fitHits
-            # for index in indexHitArr:
-            #     # Remove the coordinate of the planes hit,
-            #     # only the coordinates of the missed hits remains.
-            #     hitsMissed[index] = ROOT.TVector3(-1.68283565985,-1,50)
-            # hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
-            # print(len(hitsMissed))
+            #hitsMissed = fitHits
+            hitsMissed = [ROOT.TVector3(x[0],x[1],x[2]) for x in fitHits]
+            for index in indexHitArr:
+                # Remove the coordinate of the planes hit,
+                # only the coordinates of the missed hits remains.
+                hitsMissed[index] = ROOT.TVector3(-1.68283565985,-1,50)
+            hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
+            #print(len(hitsMissed))
 
             arrPosStart = []
             arrPosStop = []
@@ -171,18 +172,34 @@ for sTree in eventTree: # sTree == single tree for one event
                 # Apply offset and put in array
                 arrPosStart.append(A + offset)            
                 arrPosStop.append(B + offset)
-            if True: # Put True to display 3d trajectories
+            if chi2_nDf>150: # display 3d trajectories with condition
                 
                 display3dTrack(
                     arrPosStart = arrPosStart, 
                     arrPosStop = arrPosStop, 
                     trackTask = trackTask,
                     offset = offset,
-                    fitHits = fitHits)
+                    fitHits = hitsMissed)
         else:
-            eventOut +=1
+            # if hasn't cross al planes
+            pass
     # Else if don't pass event selection with number station hit:
     else:
         # print('Bad event!')
         pass
-print(f'Total events in: {eventIn}, total events out: {eventOut}')
+
+binsArr = np.linspace(0,5000,5000)
+fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
+ax.hist(chi2_nDfArr, bins=binsArr)
+ax.set_xlim(left=0.0,right=5000)
+plt.xlabel('chi2/dof')
+plt.ylabel('Number of events')
+plt.show()
+plt.close()
+
+fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
+ax.hist(nPlanesHit)
+plt.xlabel('Number of planes hit')
+plt.ylabel('Number of events')
+plt.show()
+plt.close()
