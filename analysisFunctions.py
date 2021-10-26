@@ -1,6 +1,6 @@
 
 import ROOT
-
+import numpy as np
 
 
 def goodEvent(eventTree, nStations, allowMore):
@@ -138,3 +138,37 @@ def sortHitStation(clusterArr,stationArr):
             clusTest.append(cluster)
             # print(f'{cluster.GetFirst()//1000000} is NOT ok for fit! Used to test')
     return clusFit, clusTest
+
+
+def distFit(fitHits, clusterArr, testStationNum):
+    '''
+    Takes the cluster list of an event (clusterArr), the fit
+    (constructed with the 4 stations) hits on all the the plane
+    fitHits which is a 10 elements array and the 5th test station
+    (testStationNum) to compute the distance between the test station's
+    hits and the predicted position by the fit on the same plane.
+    '''
+    horIndex = 2 * (testStationNum - 1)
+    verIndex = horIndex +1
+    horClusters = [1000] # Large numer so it will be the minimum
+    verClusters = [1000] # only if the array is empty
+    #Fill horizontal and vertical cluster lists of the test plane:
+    for cluster in clusterArr:
+        if (cluster.GetFirst()//1000000) == testStationNum:
+            A,B = ROOT.TVector3(),ROOT.TVector3()
+            cluster.GetPosition(A,B)
+            if ((cluster.GetFirst()//100000) % 2 ) == 0:
+                #print(f'Test must be 0: {A[1]-B[1]}')
+                horClusters.append(A[1])
+            else:
+                verClusters.append(A[0])
+                #print(f'Test must be 0: {A[0]-B[0]}')
+
+    horFit = fitHits[horIndex][1]
+    verFit = fitHits[verIndex][0]
+    # We want the differece (no abs) of the closest point(in absolute diff)
+    horDiffIndex = np.argmin([abs(x - horFit) for x in horClusters]) # Minimal distance
+    verDiffIndex = np.argmin([abs(y - verFit) for y in verClusters])
+    horDiff = horClusters[horDiffIndex] - horFit
+    verDiff = verClusters[verDiffIndex] - verFit
+    return horDiff, verDiff

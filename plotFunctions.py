@@ -234,3 +234,21 @@ def planesHist(nPlanesHit):
     plt.ylabel('Number of events')
     plt.show()
     plt.close()
+
+def diffHist(horDiffArr, verDiffArr):
+    fig, (ax1, ax2) = plt.subplots(2)
+    fig.set_size_inches(8, 8)
+    fig.suptitle(f'Difference between hit and fit',
+                 fontsize='x-large',
+                 fontweight='bold')
+    binsArr = np.linspace(-0.25,0.25,500)
+    ax1.hist(verDiffArr, bins=binsArr)
+    ax1.set_xlabel(r'$\Delta$ x [cm]')
+    ax1.set_ylabel('Number of events')
+
+    ax2.hist(horDiffArr, bins=binsArr)
+    ax2.set_xlabel(r'$\Delta$ y [cm]')
+    ax2.set_ylabel('Number of events')
+    
+    plt.show()
+    plt.close()

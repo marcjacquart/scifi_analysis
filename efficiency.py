@@ -27,9 +27,9 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import (goodEvent, zPlaneArr, extendHits,
+from analysisFunctions import (goodEvent, zPlaneArr, extendHits, distFit,
     crossAllPlanes, indexStationsHit, sortHitStation)
-from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist
+from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist, diffHist
 
 
 # Paths+name of the data and geometry root files as script arguments:
@@ -63,17 +63,38 @@ zArr = zPlaneArr(eventTree=eventTree, geo=geo)
 
 chi2_nDfArr = [] # To fill in the loop for histogram
 nPlanesHit = [] # Same
-
+horDiffArr = []
+verDiffArr = []
 # Loop over the individual events:
 for sTree in eventTree: # sTree == single tree for one event 
     # 1: Select events with given number of stations hit:   
     if goodEvent(eventTree = eventTree, nStations = 5, allowMore = True):
        
+        # # Test cluster problem:
+        # print('##################')
+        # IDArr = []
+        # for hit in sTree.Digi_ScifiHits:
+        #     detID = int(hit.GetDetectorID())
+        #     IDArr.append(detID)
+        # IDArr.sort()
+        # prevElement=0
+        # for element in IDArr:
+        #     diff = element - prevElement
+        #     if not (diff ==1):
+        #         if diff < 10:
+        #             print(f'!!!---{element - prevElement}---!!!')
+        #         else:
+        #             print('---')
+        #     print(element)
+        #     prevElement = element
+
+
         # Fill .clusters, .trackCandidates and .event.fittedTracks:
         trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
 
         # Get fit infos on the full hit list:
         fittedTrack = trackTask.event.fittedTracks[0] # ASK THOMAS WHY LIST
+        #print(len(trackTask.event.fittedTracks)) # Why only 1?
         fitStatus = fittedTrack.getFitStatus()
         
         # Or fit only with a subset of the stations:     
@@ -92,15 +113,17 @@ for sTree in eventTree: # sTree == single tree for one event
         reducesFitStatus= reducedFit.getFitStatus()
 
         fitHitsReduced = extendHits(fittedTrack=reducedFit, zArr=zArr)
-        # Try the whole code with the reduced fit:
-
+        horDiff, verDiff = distFit(fitHits=fitHitsReduced, clusterArr=clusterArr, testStationNum=3)
+        #print(f'Diff: {horDiff}, {verDiff}')
+        horDiffArr.append(horDiff)
+        verDiffArr.append(verDiff)
         # Extend the fit crossing point to all the planes:
         fitHits = extendHits(fittedTrack=fittedTrack, zArr=zArr)
 
-        for i in range(len(fitHits)): # Check that it gives different fits:
-            print(f'Fit diff in x:{fitHitsReduced[i][0]-fitHits[i][0]}')
-            print(f'Fit diff in y:{fitHitsReduced[i][1]-fitHits[i][1]}')
-            print(f'Fit diff in z:{fitHitsReduced[i][2]-fitHits[i][2]}')
+        # for i in range(len(fitHits)): # Check that it gives different fits:
+        #     print(f'Fit diff in x:{fitHitsReduced[i][0]-fitHits[i][0]}')
+        #     print(f'Fit diff in y:{fitHitsReduced[i][1]-fitHits[i][1]}')
+        #     print(f'Fit diff in z:{fitHitsReduced[i][2]-fitHits[i][2]}')
 
         # 2: Select only trajectory crossing all the planes:
         if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
@@ -128,7 +151,7 @@ for sTree in eventTree: # sTree == single tree for one event
             # 3: Select only low chi2 tracks: good fit and no secondary events    
             if chi2_nDf<20: # display 3d trajectories with condition
                
-                if True: # Plot trajectories                    
+                if False: # Plot trajectories                    
                     arrPosStart = []
                     arrPosStop = []
                     for cluster in trackTask.clusters:
@@ -143,12 +166,13 @@ for sTree in eventTree: # sTree == single tree for one event
                         arrPosStop = arrPosStop, 
                         trackTask = trackTask,
                         fitHits = hitsMissed)
-                    display2dTrack(
-                        arrPosStart = arrPosStart, 
-                        arrPosStop = arrPosStop,
-                        trackTask = trackTask,
-                        fitHits = hitsMissed)
+                    # display2dTrack(
+                    #     arrPosStart = arrPosStart, 
+                    #     arrPosStop = arrPosStop,
+                    #     trackTask = trackTask,
+                    #     fitHits = hitsMissed)
 
 if True:
-    chi2Hist(chi2_nDfArr=chi2_nDfArr)
-    planesHist(nPlanesHit=nPlanesHit)
+    # chi2Hist(chi2_nDfArr=chi2_nDfArr)
+    # planesHist(nPlanesHit=nPlanesHit)
+    diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr)
