@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
+from scipy.optimize import curve_fit
 
 # Custom legend:
 from matplotlib.patches import Rectangle
@@ -235,20 +236,65 @@ def planesHist(nPlanesHit):
     plt.show()
     plt.close()
 
+
+def gauss(x, A, x0, sigma):
+    return  A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
 def diffHist(horDiffArr, verDiffArr):
+
+
+
     fig, (ax1, ax2) = plt.subplots(2)
     fig.set_size_inches(8, 8)
     fig.suptitle(f'Difference between hit and fit',
                  fontsize='x-large',
                  fontweight='bold')
     binsArr = np.linspace(-0.25,0.25,500)
-    ax1.hist(verDiffArr, bins=binsArr)
+    hist1n, hist1Bins, hist1Patches = ax1.hist(verDiffArr, bins=binsArr)
     ax1.set_xlabel(r'$\Delta$ x [cm]')
     ax1.set_ylabel('Number of events')
 
-    ax2.hist(horDiffArr, bins=binsArr)
+    hist2n, hist2Bins, hist2Patches = ax2.hist(horDiffArr, bins=binsArr)
     ax2.set_xlabel(r'$\Delta$ y [cm]')
     ax2.set_ylabel('Number of events')
+
+    diff = hist1Bins[1] - hist1Bins[0]
+    binCenters = [hist1Bins[i] + diff for i in range(len(hist1Bins)-1)]
     
+    # Gaussian fits:
+    param1, cov1 = curve_fit(f=gauss, xdata=binCenters, ydata = hist1n)
+    errA1=np.sqrt(cov1[0][0])
+    errX01=np.sqrt(cov1[1][1])
+    errSigma1=np.sqrt(cov1[2][2])
+    ax1.plot(
+        binCenters, 
+        [gauss(
+            x = binCenters[i],
+            A = param1[0],
+            x0 = param1[1],
+            sigma = param1[2]) 
+            for i in range(len(binCenters))],
+        color = 'r',
+        label = (f'Gaussian fit: x0 = {param1[1]:.2} ± {errX01:.2}'
+               + f'\n                     sigma = {param1[2]:.2} ± {errSigma1:.2}'))
+    ax1.legend()
+
+    param2, cov2 = curve_fit(f=gauss, xdata=binCenters, ydata = hist2n)
+    errA2 = np.sqrt(cov2[0][0])
+    errX02 = np.sqrt(cov2[1][1])
+    errSigma2 = np.sqrt(cov2[2][2])
+    ax2.plot(
+        binCenters, 
+        [gauss(
+            x = binCenters[i],
+            A = param2[0],
+            x0 = param2[1],
+            sigma = param2[2]) 
+            for i in range(len(binCenters))],
+        color = 'r',
+        label = (f'Gaussian fit: x0 = {param2[1]:.2} ± {errX02:.2}'
+               + f'\n                     sigma = {param2[2]:.2} ± {errSigma2:.2}'))
+    ax2.legend()
+
     plt.show()
     plt.close()
