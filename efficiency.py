@@ -28,8 +28,8 @@ import SndlhcTracking
 
 # Custom functions defined in external file:
 from analysisFunctions import (goodEvent, zPlaneArr, extendHits,
-    crossAllPlanes, indexStationsHit, chi2Hist, planesHist)
-from plotFunctions import display3dTrack, display2dTrack
+    crossAllPlanes, indexStationsHit, sortHitStation)
+from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist
 
 
 # Paths+name of the data and geometry root files as script arguments:
@@ -59,7 +59,7 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 
 # z positions of the planes, array of 10 float
 zArr = zPlaneArr(eventTree=eventTree, geo=geo)
-print(zArr)
+#print(zArr)
 
 chi2_nDfArr = [] # To fill in the loop for histogram
 nPlanesHit = [] # Same
@@ -67,63 +67,79 @@ nPlanesHit = [] # Same
 # Loop over the individual events:
 for sTree in eventTree: # sTree == single tree for one event 
     # 1: Select events with given number of stations hit:   
-    if goodEvent(eventTree = eventTree, nStations = 4, allowMore = True):
+    if goodEvent(eventTree = eventTree, nStations = 5, allowMore = True):
        
         # Fill .clusters, .trackCandidates and .event.fittedTracks:
         trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
 
+        # Get fit infos on the full hit list:
         fittedTrack = trackTask.event.fittedTracks[0] # ASK THOMAS WHY LIST
-        fitStatus   = fittedTrack.getFitStatus()
-        if fitStatus.getNdf() == 0.0:
-            # Perfect fit because no degree of freedom
-            # Put impossiblie chi2 -1 value to put them apart
-            chi2_nDf = -1
-        else:
-            chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
+        fitStatus = fittedTrack.getFitStatus()
+        
+        # Or fit only with a subset of the stations:     
+        FitStations = [1,2,4,5] # 3 is used as test
+        clusterArr = trackTask.clusters
+        clusFit, clusTest = sortHitStation(clusterArr=clusterArr,stationArr=FitStations)
+        # Do the manual fit with the reduced number of stations:
+        # Need manual dictionnary for the fitTrack(hitlist):
+        clusDict = {}
+        for x in clusFit:
+            A,B = ROOT.TVector3(),ROOT.TVector3()
+            clusterID = x.GetFirst()
+            dictEntery = {clusterID: x}
+            clusDict.update(dictEntery)
+        reducedFit = trackTask.fitTrack(hitlist=clusDict)
 
-        # Append for histtograms (nPlanes after chi2 selection?)
-        chi2_nDfArr.append(chi2_nDf)
-        nPlanesHit.append(len(indexStationsHit(eventTree)))
 
         # Extend the fit crossing point to all the planes:
         fitHits = extendHits(fittedTrack=fittedTrack, zArr=zArr)
-        
+
         # 2: Select only trajectory crossing all the planes:
         if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
+            
             indexHitArr = indexStationsHit(eventTree = eventTree)
-            nPlanesMissed = 10-len(indexHitArr)
-
-            #hitsMissed = fitHits
-            hitsMissed = [ROOT.TVector3(x[0],x[1],x[2]) for x in fitHits]
+            hitsMissed = [ROOT.TVector3(x[0],x[1],x[2]) for x in fitHits] # Copy values, not pointers
             for index in indexHitArr:
                 # Remove the coordinate of the planes hit,
                 # only the coordinates of the missed hits remains.
-                hitsMissed[index] = ROOT.TVector3(-1.68283565985,-1,50)
+                hitsMissed[index] = ROOT.TVector3(-1.68283565985,0,0) # Flag to remove
             hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
-            #print(len(hitsMissed))
 
-            arrPosStart = []
-            arrPosStop = []
-            for cluster in trackTask.clusters:
-                # A: beginning, B: end of the activated scintillating bar.
-                A,B = ROOT.TVector3(),ROOT.TVector3()
-                cluster.GetPosition(A,B) # Fill A and B directly with position.
-                # hit.isVertical(): True if vertical fibers measuring x coord.
-                arrPosStart.append(A)            
-                arrPosStop.append(B)
+            # Chi2:
+            if fitStatus.getNdf() == 0.0:
+                # Perfect fit because no degree of freedom
+                # Put impossiblie chi2 -1 value to put them apart
+                chi2_nDf = -1
+            else:
+                chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
+
+            # Append for histtograms (nPlanes after chi2 selection?)
+            chi2_nDfArr.append(chi2_nDf)
+            nPlanesHit.append(len(indexStationsHit(eventTree)))
+
             # 3: Select only low chi2 tracks: good fit and no secondary events    
             if chi2_nDf<20: # display 3d trajectories with condition
-                if True:
+               
+                if True: # Plot trajectories                    
+                    arrPosStart = []
+                    arrPosStop = []
+                    for cluster in trackTask.clusters:
+                        # A: beginning, B: end of the activated scintillating bar.
+                        A,B = ROOT.TVector3(),ROOT.TVector3()
+                        cluster.GetPosition(A,B) # Fill A and B directly with position.
+                        # hit.isVertical(): True if vertical fibers measuring x coord.
+                        arrPosStart.append(A)            
+                        arrPosStop.append(B)
                     display3dTrack(
                         arrPosStart = arrPosStart, 
                         arrPosStop = arrPosStop, 
                         trackTask = trackTask,
                         fitHits = hitsMissed)
-                display2dTrack(
-                    arrPosStart = arrPosStart, 
-                    arrPosStop = arrPosStop,
-                    trackTask = trackTask,
-                    fitHits = hitsMissed)
+                    display2dTrack(
+                        arrPosStart = arrPosStart, 
+                        arrPosStop = arrPosStop,
+                        trackTask = trackTask,
+                        fitHits = hitsMissed)
 
 if True:
     chi2Hist(chi2_nDfArr=chi2_nDfArr)

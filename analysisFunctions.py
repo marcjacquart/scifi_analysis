@@ -120,3 +120,21 @@ def zPlaneArr(eventTree,geo):
             break
     #print(f'zArr: {zArr}')
     return zArr
+
+def sortHitStation(clusterArr,stationArr):
+    '''
+    return the array of hits from hitArr that belongs
+    to one of the stations from stationArr
+    '''
+    
+    clusFit = []
+    clusTest = []
+    for cluster in clusterArr:
+        # If the cluster station is inside our list to fit:
+        if (cluster.GetFirst()//1000000) in stationArr:
+            # print(f'{cluster.GetFirst()//1000000} is OK for fit!')
+            clusFit.append(cluster)
+        else:
+            clusTest.append(cluster)
+            # print(f'{cluster.GetFirst()//1000000} is NOT ok for fit! Used to test')
+    return clusFit, clusTest
