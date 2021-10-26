@@ -89,10 +89,18 @@ for sTree in eventTree: # sTree == single tree for one event
             dictEntery = {clusterID: x}
             clusDict.update(dictEntery)
         reducedFit = trackTask.fitTrack(hitlist=clusDict)
+        reducesFitStatus= reducedFit.getFitStatus()
 
+        fitHitsReduced = extendHits(fittedTrack=reducedFit, zArr=zArr)
+        # Try the whole code with the reduced fit:
 
         # Extend the fit crossing point to all the planes:
         fitHits = extendHits(fittedTrack=fittedTrack, zArr=zArr)
+
+        for i in range(len(fitHits)): # Check that it gives different fits:
+            print(f'Fit diff in x:{fitHitsReduced[i][0]-fitHits[i][0]}')
+            print(f'Fit diff in y:{fitHitsReduced[i][1]-fitHits[i][1]}')
+            print(f'Fit diff in z:{fitHitsReduced[i][2]-fitHits[i][2]}')
 
         # 2: Select only trajectory crossing all the planes:
         if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
