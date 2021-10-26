@@ -4,10 +4,11 @@
 
 # This script:
 #    - Import the raw data and geomery files
-#    - Use the geometry o compute cluster positions
-#    - Do a linear fit using 4 planes
-#    - Tries to find the 5th along the fit to measure the efficiency
-# It uses the functions defined in analysisFunctions.py
+#    - Use the geometry to compute cluster positions
+#    - Select events with station hit number, chi2 
+#      or constrained tracks within the detector.
+#    - Fit and display the events.
+# Uses functions from analysisFunctions.py and plotFunctions.py
 
 
 # Imports:
@@ -26,12 +27,12 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import (display3dTrack, goodEvent, 
-    crossAllPlanes, indexStationsHit, display2dTrack)
+from analysisFunctions import (goodEvent, zPlaneArr,
+    crossAllPlanes, indexStationsHit, chi2Hist, planesHist)
+from plotFunctions import display3dTrack, display2dTrack
 
 
-# Paths+name of the data and geometry root files passed to the script as
-# mendatory arguments.
+# Paths+name of the data and geometry root files as script arguments:
 parser = ArgumentParser()
 parser.add_argument("-p", "--path", dest="path", help="run number",required=True,default="")
 parser.add_argument("-f", "--inputFile", dest="inputFile", help="input root file",default="",required=True)
@@ -53,68 +54,23 @@ eventTree = rootFile.rawConv
 trackTask = SndlhcTracking.Tracking()
 trackTask.InitTask(eventTree)
 
-# GetCurrentNavigator() Returns current navigator for the calling thread. 
-# A navigator is a class providing navigation API for TGeo geometries.
-# Need it to browse trough the geometry files.
+# GetCurrentNavigator() to browse trough the geometry files (TGeo class).
 nav = ROOT.gGeoManager.GetCurrentNavigator()
 
-# 3 branchs are in the data root file:
-#   - EventHeader with the following infos:
-#       - fEventTime about the time of the event (8e9 between pulses)
-#   - Digi_ScifiHits with the following infos:
-#       - fDetectorID (Digi_ScifiHits.fDetectorID is the full leaf name)
-#       - signals
-#       - times
-#       - nphe_min / nphe_max
-#       - ly_loss_params
-#       - @size
-#   - Digi_MuFilterHit which is empty due to only SciFi being tested here.
+# z positions of the planes, array of 10 elements
+zArr = zPlaneArr(eventTree=eventTree, geo=geo)
+print(zArr)
 
-
-zArr = [0,0,0,0,0,0,0,0,0,0] # Fill Z coordinate of the planes
-# format: [1hor, 1ver, 2hor, ...,5hor, 5ver]
-# /!\ THIS ASSUME Z FIX FOR ALL THE PLANE!
-# Warning message if z values > epsilon for different SiPM of same plane
-epsilon = 0.0001 
 chi2_nDfArr = [] # To fill for histogram
 nPlanesHit = []
-for sTree in eventTree: # Need the first event with all planes hit:
-    if goodEvent(eventTree = eventTree, nStations = 5, allowMore = False):
-        A,B = ROOT.TVector3(),ROOT.TVector3()
-        for hit in sTree.Digi_ScifiHits:
-            hitID = hit.GetChannelID()
-            geo.modules['Scifi'].GetSiPMPosition(hitID,A,B)
-            indexArr = (hitID // 1000000-1) * 2  + (hitID // 100000) % 2
-            #           add 2 for each plane      add 1 if vertical
 
-            zVal = 0.5 * (A[2] + B[2])
-            #Will overwrite if event of same plane, good to check if same z.
-            if zArr[indexArr]!=0 and zArr[indexArr]-zVal>epsilon:
-                print(f'WARNING: SciFi planes {indexArr} not aligned in Z direction!')
-            zArr[indexArr] = zVal # Fill z array
-        break
-#print(f'zArr: {zArr}')
-
-
-offset = ROOT.TVector3(0,0,0) #(47.8,-15.3,16.5) # To have coordinates between 0 and 40.
 for sTree in eventTree: # sTree == single tree for one event
     # scifiCluster() only works when in the loop O_o?
     clusterArr = trackTask.scifiCluster() # Warning: cluster type sndCluster
     #print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
     #    + f'into {len(clusterArr)} clusters.')
 
-    trackTask.ExecuteTask()
-    # Clusters are stored in the list: trackTask.clusters
-    
-    # <sndCluster>.GetFirst() gives the first sipm channel number: STMRFFF
-    # First digit S:       station # within the sub-detector 1-5
-    # Second digit T:      type of the plane: 0-horizontal fiber plane, 
-    #                      1-vertical fiber plane
-    # Third digit M:       determines the mat number 0-2
-    # Fourth digit S:      SiPM number  0-3
-    # Last three digits F: local SiPM channel number in one mat  0-127
-
-    # Chi2/nDOF to measure the fit (DOF: degrees of freedom of the fit)
+    trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
     
     if goodEvent(eventTree = eventTree, nStations = 4, allowMore = True):
         # Put the event to the dict format to use fitTrack()
@@ -169,17 +125,15 @@ for sTree in eventTree: # sTree == single tree for one event
                 A,B = ROOT.TVector3(),ROOT.TVector3()
                 cluster.GetPosition(A,B) # Fill A and B directly with position.
                 # hit.isVertical(): True if vertical fibers measuring x coord.
+                arrPosStart.append(A)            
+                arrPosStop.append(B)
                 
-                # Apply offset and put in array
-                arrPosStart.append(A + offset)            
-                arrPosStop.append(B + offset)
-            if chi2_nDf>150: # display 3d trajectories with condition
-                if False:
+            if chi2_nDf<20: # display 3d trajectories with condition
+                if True:
                     display3dTrack(
                         arrPosStart = arrPosStart, 
                         arrPosStop = arrPosStop, 
                         trackTask = trackTask,
-                        offset = offset,
                         fitHits = hitsMissed)
                 display2dTrack(
                     arrPosStart = arrPosStart, 
@@ -194,18 +148,5 @@ for sTree in eventTree: # sTree == single tree for one event
         # print('Bad event!')
         pass
 
-binsArr = np.linspace(0,5000,5000)
-fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
-ax.hist(chi2_nDfArr, bins=binsArr)
-ax.set_xlim(left=0.0,right=5000)
-plt.xlabel('chi2/dof')
-plt.ylabel('Number of events')
-plt.show()
-plt.close()
 
-fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
-ax.hist(nPlanesHit)
-plt.xlabel('Number of planes hit')
-plt.ylabel('Number of events')
-plt.show()
-plt.close()
+chi2Hist(chi2_nDfArr)
