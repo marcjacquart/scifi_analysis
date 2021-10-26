@@ -27,7 +27,7 @@ import SndlhcGeo
 import SndlhcTracking
 
 # Custom functions defined in external file:
-from analysisFunctions import (goodEvent, zPlaneArr,
+from analysisFunctions import (goodEvent, zPlaneArr, extendHits,
     crossAllPlanes, indexStationsHit, chi2Hist, planesHist)
 from plotFunctions import display3dTrack, display2dTrack
 
@@ -57,31 +57,22 @@ trackTask.InitTask(eventTree)
 # GetCurrentNavigator() to browse trough the geometry files (TGeo class).
 nav = ROOT.gGeoManager.GetCurrentNavigator()
 
-# z positions of the planes, array of 10 elements
+# z positions of the planes, array of 10 float
 zArr = zPlaneArr(eventTree=eventTree, geo=geo)
 print(zArr)
 
-chi2_nDfArr = [] # To fill for histogram
-nPlanesHit = []
+chi2_nDfArr = [] # To fill in the loop for histogram
+nPlanesHit = [] # Same
 
-for sTree in eventTree: # sTree == single tree for one event
-    # scifiCluster() only works when in the loop O_o?
-    clusterArr = trackTask.scifiCluster() # Warning: cluster type sndCluster
-    #print(f'Clustering reduced {len(sTree.Digi_ScifiHits)} hits '
-    #    + f'into {len(clusterArr)} clusters.')
-
-    trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
-    
+# Loop over the individual events:
+for sTree in eventTree: # sTree == single tree for one event 
+    # 1: Select events with given number of stations hit:   
     if goodEvent(eventTree = eventTree, nStations = 4, allowMore = True):
-        # Put the event to the dict format to use fitTrack()
-        hitList = {}
-        for x in clusterArr:
-            A,B = ROOT.TVector3(),ROOT.TVector3()
-            #x.GetPosition(A,B)
-            clusterID = x.GetFirst()
-            dictEntery = {clusterID: x}
-            hitList.update(dictEntery)
-        fittedTrack = trackTask.fitTrack(hitlist=hitList) # type: genfit::Track
+       
+        # Fill .clusters, .trackCandidates and .event.fittedTracks:
+        trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
+
+        fittedTrack = trackTask.event.fittedTracks[0] # ASK THOMAS WHY LIST
         fitStatus   = fittedTrack.getFitStatus()
         if fitStatus.getNdf() == 0.0:
             # Perfect fit because no degree of freedom
@@ -89,22 +80,15 @@ for sTree in eventTree: # sTree == single tree for one event
             chi2_nDf = -1
         else:
             chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
+
+        # Append for histtograms (nPlanes after chi2 selection?)
         chi2_nDfArr.append(chi2_nDf)
         nPlanesHit.append(len(indexStationsHit(eventTree)))
-        #print(f'Fit points: {fittedTrack.getPoints()}')
-        #print(f'chi2_nDf: {chi2_nDf}')
 
-        fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
-        # for i in range(fittedTrack.getNumPointsWithMeasurement()):
-        # Only the first can be used, other hits give same line
-        state = fittedTrack.getFittedState(0)
-        pos = state.getPos()
-        mom = state.getMom()
-        # linear fit: pos + lambda * mom
-        for planeIndex in range(len(zArr)):
-            lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
-            fitHits[planeIndex] = pos + lambdaPlane * mom
-
+        # Extend the fit crossing point to all the planes:
+        fitHits = extendHits(fittedTrack=fittedTrack, zArr=zArr)
+        
+        # 2: Select only trajectory crossing all the planes:
         if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
             indexHitArr = indexStationsHit(eventTree = eventTree)
             nPlanesMissed = 10-len(indexHitArr)
@@ -120,14 +104,14 @@ for sTree in eventTree: # sTree == single tree for one event
 
             arrPosStart = []
             arrPosStop = []
-            for cluster in clusterArr:
+            for cluster in trackTask.clusters:
                 # A: beginning, B: end of the activated scintillating bar.
                 A,B = ROOT.TVector3(),ROOT.TVector3()
                 cluster.GetPosition(A,B) # Fill A and B directly with position.
                 # hit.isVertical(): True if vertical fibers measuring x coord.
                 arrPosStart.append(A)            
                 arrPosStop.append(B)
-                
+            # 3: Select only low chi2 tracks: good fit and no secondary events    
             if chi2_nDf<20: # display 3d trajectories with condition
                 if True:
                     display3dTrack(
@@ -140,13 +124,7 @@ for sTree in eventTree: # sTree == single tree for one event
                     arrPosStop = arrPosStop,
                     trackTask = trackTask,
                     fitHits = hitsMissed)
-        else:
-            # if hasn't cross al planes
-            pass
-    # Else if don't pass event selection with number station hit:
-    else:
-        # print('Bad event!')
-        pass
 
-
-chi2Hist(chi2_nDfArr)
+if True:
+    chi2Hist(chi2_nDfArr=chi2_nDfArr)
+    planesHist(nPlanesHit=nPlanesHit)

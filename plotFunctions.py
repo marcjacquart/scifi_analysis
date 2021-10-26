@@ -1,3 +1,4 @@
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
@@ -215,3 +216,21 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
     plt.show()
     plt.close()
 
+
+def chi2Hist(chi2_nDfArr):
+    binsArr = np.linspace(0,5000,5000)
+    fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
+    ax.hist(chi2_nDfArr, bins=binsArr)
+    ax.set_xlim(left=0.0,right=5000)
+    plt.xlabel('chi2/dof')
+    plt.ylabel('Number of events')
+    plt.show()
+    plt.close()
+
+def planesHist(nPlanesHit):   
+    fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
+    ax.hist(nPlanesHit)
+    plt.xlabel('Number of planes hit')
+    plt.ylabel('Number of events')
+    plt.show()
+    plt.close()

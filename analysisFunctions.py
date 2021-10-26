@@ -1,6 +1,6 @@
 
 import ROOT
-import numpy as np
+
 
 
 def goodEvent(eventTree, nStations, allowMore):
@@ -39,6 +39,22 @@ def indexStationsHit(eventTree):
     for planeID in stations.values():
         indexHitArr.append(planeID)
     return indexHitArr
+
+
+def extendHits(fittedTrack, zArr):
+    '''Extend the fit position to include missing planes hit'''
+    
+    fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
+    # for i in range(fittedTrack.getNumPointsWithMeasurement()):
+    # Only the first can be used, other hits give same line
+    state = fittedTrack.getFittedState(0)
+    pos = state.getPos()
+    mom = state.getMom()
+    # linear fit: pos + lambda * mom
+    for planeIndex in range(len(zArr)):
+        lambdaPlane = (zArr[planeIndex] - pos[2]) / mom[2]
+        fitHits[planeIndex] = pos + lambdaPlane * mom
+    return fitHits
 
 
 def crossAllPlanes(fitHitsArr,geo, verbose=False):
@@ -104,21 +120,3 @@ def zPlaneArr(eventTree,geo):
             break
     #print(f'zArr: {zArr}')
     return zArr
-
-def chi2Hist(chi2_nDfArr):
-    binsArr = np.linspace(0,5000,5000)
-    fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
-    ax.hist(chi2_nDfArr, bins=binsArr)
-    ax.set_xlim(left=0.0,right=5000)
-    plt.xlabel('chi2/dof')
-    plt.ylabel('Number of events')
-    plt.show()
-    plt.close()
-
-def planesHist(nPlanesHit):   
-    fig, ax =plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
-    ax.hist(nPlanesHit)
-    plt.xlabel('Number of planes hit')
-    plt.ylabel('Number of events')
-    plt.show()
-    plt.close()
