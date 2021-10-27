@@ -179,11 +179,13 @@ for testStationNum in [1,2,3,4,5]:
                         #     fitHits = hitsMissed)
 
 
-    resultFit = diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr)
+    resultFit = diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr, stationNum=testStationNum)
     gaussFitArr.append(resultFit)
+    print(f'Test station: {testStationNum}')
 
 allPlanesGauss(fitArr=gaussFitArr)
 if False:
+    pass
     # chi2Hist(chi2_nDfArr=chi2_nDfArr)
     # planesHist(nPlanesHit=nPlanesHit)
     

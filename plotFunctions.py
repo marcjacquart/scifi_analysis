@@ -243,7 +243,7 @@ def gauss(x, A, x0, sigma):
     ''' Gaussian function.'''
     return  A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-def diffHist(horDiffArr, verDiffArr):
+def diffHist(horDiffArr, verDiffArr, stationNum):
     '''
     Histogram of position difference between the fit on 4 planes and
     the hit on th 5th one. Gaussian fit.
@@ -252,7 +252,7 @@ def diffHist(horDiffArr, verDiffArr):
 
     fig, (ax1, ax2) = plt.subplots(2)
     fig.set_size_inches(8, 8)
-    fig.suptitle(f'Difference between hit and fit',
+    fig.suptitle(f'Difference between hit and fit, test station {stationNum}.',
                  fontsize='x-large',
                  fontweight='bold')
     binsArr = np.linspace(-0.25,0.25,500)
@@ -282,7 +282,7 @@ def diffHist(horDiffArr, verDiffArr):
             for i in range(len(binCenters))],
         color = 'r',
         label = (f'Gaussian fit: x0 = {param1[1]:.2} ± {errX01:.2}'
-               + f'\n                     sigma = {param1[2]:.2} ± {errSigma1:.2}'))
+               + f'\n                     sigma = {abs(param1[2]):.2} ± {errSigma1:.2}'))
     ax1.legend()
 
     param2, cov2 = curve_fit(f=gauss, xdata=binCenters, ydata = hist2n)
@@ -299,12 +299,13 @@ def diffHist(horDiffArr, verDiffArr):
             for i in range(len(binCenters))],
         color = 'r',
         label = (f'Gaussian fit: x0 = {param2[1]:.2} ± {errX02:.2}'
-               + f'\n                     sigma = {param2[2]:.2} ± {errSigma2:.2}'))
+               + f'\n                     sigma = {abs(param2[2]):.2} ± {errSigma2:.2}'))
     ax2.legend()
-
-    plt.show()
+    plt.savefig(f'diffHistGauss_testStation{stationNum}.pdf')
+    #plt.show()
     plt.close()
-    resultFit = [param1[1], errX01, param1[2], errSigma1, param2[1], errX02, param2[2], errSigma2]
+    # Sigma can be fitted negative, but return abs() by convention.
+    resultFit = [param1[1], errX01, abs(param1[2]), errSigma1, param2[1], errX02, abs(param2[2]), errSigma2]
     return resultFit
 
 def allPlanesGauss(fitArr):
@@ -315,45 +316,62 @@ def allPlanesGauss(fitArr):
     zeroArr = [0,0,0,0,0]
     # Extract data from array: See order of return of diffHist()
     x0_x = [x[0] for x in fitArr]
-    err_x0_x = [x[1] for x in fitArr]
+    err_x0_x = [10 * x[1] for x in fitArr]
     sigma_x = [x[2] for x in fitArr]
-    err_sigma_x = [x[3] for x in fitArr]
+    err_sigma_x = [10 * x[3] for x in fitArr]
     x0_y = [x[4] for x in fitArr]
-    err_x0_y = [x[5] for x in fitArr]
+    err_x0_y = [10 * x[5] for x in fitArr]
     sigma_y = [x[6] for x in fitArr]
-    err_sigma_y = [x[7] for x in fitArr]
+    err_sigma_y = [10 * x[7] for x in fitArr]
 
-    fig, ((ax1, ax2),(ax3, ax4)) = plt.subplots(nrows=2,nclo=2,sharex='col',tight_layout=True)
+    fig, ((ax1, ax3),(ax2, ax4)) = plt.subplots(
+        nrows = 2,
+        ncols = 2,
+        sharex = 'col',
+        tight_layout = True)
+    fig.set_size_inches(8, 8)
+    # fig.suptitle(f'Difference between hit and fit',
+    #              fontsize='x-large',
+    #              fontweight='bold')
     ax1.errorbar(
         x = stationsArr,
         y = x0_x,
-        x_err = zeroArr,
-        y_err = err_x0_x)
+        xerr = zeroArr,
+        yerr = err_x0_x,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'k')
     ax2.errorbar(
         x = stationsArr,
         y = sigma_x,
-        x_err = zeroArr,
-        y_err = err_sigma_x)
+        xerr = zeroArr,
+        yerr = err_sigma_x,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'k')
     ax3.errorbar(
         x = stationsArr,
         y = x0_y,
-        x_err = zeroArr,
-        y_err = err_x0_y)
+        xerr = zeroArr,
+        yerr = err_x0_y,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'k')
     ax4.errorbar(
         x = stationsArr,
         y = sigma_y,
-        x_err = zeroArr,
-        y_err = err_sigma_y)
+        xerr = zeroArr,
+        yerr = err_sigma_y,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'k')
     ax1.set_ylabel('X offset [cm]')
     ax2.set_ylabel(r'$\sigma_x$ [cm]')
     ax3.set_ylabel('Y offset [cm]')
     ax4.set_ylabel(r'$\sigma_y$ [cm]')
     ax2.set_xlabel('Test station')
     ax4.set_xlabel('Test station')
-    fig.set_size_inches(8, 8)
-    fig.suptitle(f'Difference between hit and fit',
-                 fontsize='x-large',
-                 fontweight='bold')
+    plt.savefig('FullStationsDiff.pdf')
     plt.show()
-    plt.savefile('FullStationsDiff.pdf')
+
     plt.close()
