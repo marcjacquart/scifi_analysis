@@ -219,6 +219,7 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
 
 def chi2Hist(chi2_nDfArr):
+    '''Chi2/nDOF histogram.'''
     binsArr = np.linspace(0,5000,5000)
     fig, ax = plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
     ax.hist(chi2_nDfArr, bins=binsArr)
@@ -228,7 +229,8 @@ def chi2Hist(chi2_nDfArr):
     plt.show()
     plt.close()
 
-def planesHist(nPlanesHit):   
+def planesHist(nPlanesHit):
+    '''Historam of number of planes hit.'''
     fig, ax = plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
     ax.hist(nPlanesHit)
     plt.xlabel('Number of planes hit')
@@ -238,11 +240,15 @@ def planesHist(nPlanesHit):
 
 
 def gauss(x, A, x0, sigma):
+    ''' Gaussian function.'''
     return  A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 def diffHist(horDiffArr, verDiffArr):
-
-
+    '''
+    Histogram of position difference between the fit on 4 planes and
+    the hit on th 5th one. Gaussian fit.
+    Return [x0, err_x0, sigma, err_sigma] of gaussian fit.
+    '''
 
     fig, (ax1, ax2) = plt.subplots(2)
     fig.set_size_inches(8, 8)
@@ -297,4 +303,57 @@ def diffHist(horDiffArr, verDiffArr):
     ax2.legend()
 
     plt.show()
+    plt.close()
+    resultFit = [param1[1], errX01, param1[2], errSigma1, param2[1], errX02, param2[2], errSigma2]
+    return resultFit
+
+def allPlanesGauss(fitArr):
+    '''
+    Global plot for the 5 test stations.
+    '''
+    stationsArr = [1,2,3,4,5]
+    zeroArr = [0,0,0,0,0]
+    # Extract data from array: See order of return of diffHist()
+    x0_x = [x[0] for x in fitArr]
+    err_x0_x = [x[1] for x in fitArr]
+    sigma_x = [x[2] for x in fitArr]
+    err_sigma_x = [x[3] for x in fitArr]
+    x0_y = [x[4] for x in fitArr]
+    err_x0_y = [x[5] for x in fitArr]
+    sigma_y = [x[6] for x in fitArr]
+    err_sigma_y = [x[7] for x in fitArr]
+
+    fig, ((ax1, ax2),(ax3, ax4)) = plt.subplots(nrows=2,nclo=2,sharex='col',tight_layout=True)
+    ax1.errorbar(
+        x = stationsArr,
+        y = x0_x,
+        x_err = zeroArr,
+        y_err = err_x0_x)
+    ax2.errorbar(
+        x = stationsArr,
+        y = sigma_x,
+        x_err = zeroArr,
+        y_err = err_sigma_x)
+    ax3.errorbar(
+        x = stationsArr,
+        y = x0_y,
+        x_err = zeroArr,
+        y_err = err_x0_y)
+    ax4.errorbar(
+        x = stationsArr,
+        y = sigma_y,
+        x_err = zeroArr,
+        y_err = err_sigma_y)
+    ax1.set_ylabel('X offset [cm]')
+    ax2.set_ylabel(r'$\sigma_x$ [cm]')
+    ax3.set_ylabel('Y offset [cm]')
+    ax4.set_ylabel(r'$\sigma_y$ [cm]')
+    ax2.set_xlabel('Test station')
+    ax4.set_xlabel('Test station')
+    fig.set_size_inches(8, 8)
+    fig.suptitle(f'Difference between hit and fit',
+                 fontsize='x-large',
+                 fontweight='bold')
+    plt.show()
+    plt.savefile('FullStationsDiff.pdf')
     plt.close()

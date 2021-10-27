@@ -147,6 +147,7 @@ def distFit(fitHits, clusterArr, testStationNum):
     fitHits which is a 10 elements array and the 5th test station
     (testStationNum) to compute the distance between the test station's
     hits and the predicted position by the fit on the same plane.
+    Missing hits are set to 1000, easy to remove afterward.
     '''
     horIndex = 2 * (testStationNum - 1)
     verIndex = horIndex +1
