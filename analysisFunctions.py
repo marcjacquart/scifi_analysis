@@ -173,3 +173,28 @@ def distFit(fitHits, clusterArr, testStationNum):
     horDiff = horClusters[horDiffIndex] - horFit
     verDiff = verClusters[verDiffIndex] - verFit
     return horDiff, verDiff
+
+def testClusterProblem(eventTree):
+    ''' Test for cluster separated by only one unactivated SiPM channel'''
+    print('##################')
+    IDArr = []
+    for hit in sTree.Digi_ScifiHits:
+        detID = int(hit.GetDetectorID())
+        IDArr.append(detID)
+    IDArr.sort()
+    prevElement=0
+    for element in IDArr:
+        diff = element - prevElement
+        if not (diff ==1):
+            if diff < 10:
+                print(f'!!!---{element - prevElement}---!!!')
+            else:
+                print('---')
+        print(element)
+        prevElement = element
+def fitStatus(trackTask, fitOnAllStations=True):
+    '''
+    Return the fit.status object containing the fitted track.
+    '''
+    pass
+    # Test if manual fit on 5 planes is th same as te automatic one. if so make a single func here that returns fittedTrack and fitStatus for an arbitrary number of given planes.

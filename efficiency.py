@@ -28,7 +28,8 @@ import SndlhcTracking
 
 # Custom functions defined in external file:
 from analysisFunctions import (goodEvent, zPlaneArr, extendHits, distFit,
-    crossAllPlanes, indexStationsHit, sortHitStation)
+    crossAllPlanes, indexStationsHit, sortHitStation, testClusterProblem, fitStatus)
+
 from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist, diffHist, allPlanesGauss
 
 
@@ -61,45 +62,29 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 zArr = zPlaneArr(eventTree=eventTree, geo=geo)
 #print(zArr)
 
-chi2_nDfArr = [] # To fill in the loop for histogram
-nPlanesHit = [] # Same
+
 
 gaussFitArr = []
 fitStationsArr = [[2,3,4,5],[1,3,4,5],[1,2,4,5],[1,2,3,5],[1,2,3,4]]
 for testStationNum in [1,2,3,4,5]:
+    chi2_nDfArr = [] # To fill in the loop for histogram
+    nPlanesHit = [] # Same
+
     horDiffArr = []
     verDiffArr = []
     # Loop over the individual events:
     for sTree in eventTree: # sTree == single tree for one event 
-        # 1: Select events with given number of stations hit:   
+
         if goodEvent(eventTree = eventTree, nStations = 5, allowMore = True):
-           
-            # # Test cluster problem:
-            # print('##################')
-            # IDArr = []
-            # for hit in sTree.Digi_ScifiHits:
-            #     detID = int(hit.GetDetectorID())
-            #     IDArr.append(detID)
-            # IDArr.sort()
-            # prevElement=0
-            # for element in IDArr:
-            #     diff = element - prevElement
-            #     if not (diff ==1):
-            #         if diff < 10:
-            #             print(f'!!!---{element - prevElement}---!!!')
-            #         else:
-            #             print('---')
-            #     print(element)
-            #     prevElement = element
-
-
+            # testClusterProblem(eventTree = sTree)
+            
             # Fill .clusters, .trackCandidates and .event.fittedTracks:
             trackTask.ExecuteTask() # Clusters stored in trackTask.clusters
+            # Replace by manual commands????
 
             # Get fit infos on the full hit list:
-            fittedTrack = trackTask.event.fittedTracks[0] # ASK THOMAS WHY LIST
-            #print(len(trackTask.event.fittedTracks)) # Why only 1?
-            fitStatus = fittedTrack.getFitStatus()
+            fittedTrack = trackTask.event.fittedTracks[0] # why only one?
+            fitStatus = fittedTrack.getFitStatus() # Only used for chi2, overwritten for 4 stations hit.
             
             # Or fit only with a subset of the stations:     
             FitStations = fitStationsArr[testStationNum-1] # 0-4 array boundaries
@@ -116,22 +101,10 @@ for testStationNum in [1,2,3,4,5]:
             reducedFit = trackTask.fitTrack(hitlist=clusDict)
             reducesFitStatus= reducedFit.getFitStatus()
 
-            fitHitsReduced = extendHits(fittedTrack=reducedFit, zArr=zArr)
-            horDiff, verDiff = distFit(fitHits=fitHitsReduced, clusterArr=clusterArr, testStationNum=testStationNum)
-            #print(f'Diff: {horDiff}, {verDiff}')
-            if horDiff != 1000: # Don't append missing hits
-                horDiffArr.append(horDiff)
-            if verDiff != 1000:
-                verDiffArr.append(verDiff)
             # Extend the fit crossing point to all the planes:
             fitHits = extendHits(fittedTrack=fittedTrack, zArr=zArr)
 
-            # for i in range(len(fitHits)): # Check that it gives different fits:
-            #     print(f'Fit diff in x:{fitHitsReduced[i][0]-fitHits[i][0]}')
-            #     print(f'Fit diff in y:{fitHitsReduced[i][1]-fitHits[i][1]}')
-            #     print(f'Fit diff in z:{fitHitsReduced[i][2]-fitHits[i][2]}')
-
-            # 2: Select only trajectory crossing all the planes:
+            # 2: Select only trajectory crossing all the planes, use fit on all hits:
             if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
                 
                 indexHitArr = indexStationsHit(eventTree = eventTree)
@@ -143,6 +116,7 @@ for testStationNum in [1,2,3,4,5]:
                 hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
 
                 # Chi2:
+                fitStatus = reducesFitStatus # To apply chi2 on 4-station fit only
                 if fitStatus.getNdf() == 0.0:
                     # Perfect fit because no degree of freedom
                     # Put impossiblie chi2 -1 value to put them apart
@@ -150,13 +124,22 @@ for testStationNum in [1,2,3,4,5]:
                 else:
                     chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
 
-                # Append for histtograms (nPlanes after chi2 selection?)
+                # Append for histograms: (nPlanes after chi2 selection?)
                 chi2_nDfArr.append(chi2_nDf)
                 nPlanesHit.append(len(indexStationsHit(eventTree)))
 
                 # 3: Select only low chi2 tracks: good fit and no secondary events    
-                if chi2_nDf<20: # display 3d trajectories with condition
+                if chi2_nDf<30: # display 3d trajectories with condition
                    
+                    # Compute difference between hits and fit:
+                    fitHitsReduced = extendHits(fittedTrack=reducedFit, zArr=zArr)
+                    horDiff, verDiff = distFit(fitHits=fitHitsReduced, clusterArr=clusterArr, testStationNum=testStationNum)
+                    #print(f'Diff: {horDiff}, {verDiff}')
+                    if horDiff != 1000: # Don't append missing hits
+                        horDiffArr.append(horDiff)
+                    if verDiff != 1000:
+                        verDiffArr.append(verDiff)
+
                     if False: # Plot trajectories                    
                         arrPosStart = []
                         arrPosStop = []
@@ -181,11 +164,10 @@ for testStationNum in [1,2,3,4,5]:
 
     resultFit = diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr, stationNum=testStationNum)
     gaussFitArr.append(resultFit)
+    chi2Hist(chi2_nDfArr=chi2_nDfArr, stationNum=testStationNum)
+    # planesHist(nPlanesHit=nPlanesHit)
     print(f'Test station: {testStationNum}')
 
 allPlanesGauss(fitArr=gaussFitArr)
-if False:
-    pass
-    # chi2Hist(chi2_nDfArr=chi2_nDfArr)
-    # planesHist(nPlanesHit=nPlanesHit)
+
     

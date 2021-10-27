@@ -218,15 +218,16 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
     plt.close()
 
 
-def chi2Hist(chi2_nDfArr):
+def chi2Hist(chi2_nDfArr, stationNum=0):
     '''Chi2/nDOF histogram.'''
-    binsArr = np.linspace(0,5000,5000)
+    binsArr = np.linspace(0,40,400)
     fig, ax = plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
     ax.hist(chi2_nDfArr, bins=binsArr)
-    ax.set_xlim(left=0.0,right=5000)
+    ax.set_xlim(left=0.0,right=40)
     plt.xlabel('chi2/dof')
     plt.ylabel('Number of events')
-    plt.show()
+    plt.savefig(f'figures/chi2Hist_{stationNum}.png')
+    #plt.show()
     plt.close()
 
 def planesHist(nPlanesHit):
@@ -301,7 +302,7 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
         label = (f'Gaussian fit: x0 = {param2[1]:.2} ± {errX02:.2}'
                + f'\n                     sigma = {abs(param2[2]):.2} ± {errSigma2:.2}'))
     ax2.legend()
-    plt.savefig(f'diffHistGauss_testStation{stationNum}.pdf')
+    plt.savefig(f'figures/diffHistGauss_testStation{stationNum}.png')
     #plt.show()
     plt.close()
     # Sigma can be fitted negative, but return abs() by convention.
@@ -371,7 +372,7 @@ def allPlanesGauss(fitArr):
     ax4.set_ylabel(r'$\sigma_y$ [cm]')
     ax2.set_xlabel('Test station')
     ax4.set_xlabel('Test station')
-    plt.savefig('FullStationsDiff.pdf')
+    plt.savefig('figures/FullStationsDiff.png')
     plt.show()
 
     plt.close()
