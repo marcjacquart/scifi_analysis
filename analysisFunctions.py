@@ -43,7 +43,6 @@ def indexStationsHit(eventTree):
 
 def extendHits(fittedTrack, zArr):
     '''Extend the fit position to include missing planes hit'''
-    
     fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
     # for i in range(fittedTrack.getNumPointsWithMeasurement()):
     # Only the first can be used, other hits give same line
@@ -110,7 +109,7 @@ def zPlaneArr(eventTree,geo):
                 hitID = hit.GetChannelID()
                 geo.modules['Scifi'].GetSiPMPosition(hitID,A,B)
                 indexArr = (hitID // 1000000-1) * 2  + (hitID // 100000) % 2
-                #           add 2 for each plane      add 1 if vertical
+                #           add 2 for each plane        add 1 if vertical
 
                 zVal = 0.5 * (A[2] + B[2])
                 #Will overwrite if event of same plane, good to check if same z.
@@ -192,9 +191,23 @@ def testClusterProblem(eventTree):
                 print('---')
         print(element)
         prevElement = element
-def fitStatus(trackTask, fitOnAllStations=True):
+def customFitStatus(trackTask, FitStations):
     '''
-    Return the fit.status object containing the fitted track.
+    Do manually the trackTask.ExecuteTask() so it can use arbitrary number
+    of stations for the fit.
+    Return the fit and fit status object containing the fitted track.
     '''
-    pass
-    # Test if manual fit on 5 planes is th same as te automatic one. if so make a single func here that returns fittedTrack and fitStatus for an arbitrary number of given planes.
+    trackTask.clusters = trackTask.scifiCluster() # Build cluster list
+    clusFit, clusTest = sortHitStation(clusterArr=trackTask.clusters,stationArr=FitStations)
+    # Do the manual fit with the reduced number of stations:
+    # Need manual dictionnary for the fitTrack(hitlist):
+    clusDict = {}
+    for x in clusFit:
+        A,B = ROOT.TVector3(),ROOT.TVector3()
+        clusterID = x.GetFirst()
+        dictEntery = {clusterID: x}
+        clusDict.update(dictEntery)
+    fit = trackTask.fitTrack(hitlist=clusDict) # Type ROOT.genfit.Trac
+    fitStatus= fit.getFitStatus()
+    trackTask.event.fittedTracks = [fit] # Array to keep sndsw format
+    return fit, fitStatus
