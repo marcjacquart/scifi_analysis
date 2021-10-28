@@ -23,7 +23,7 @@ import SndlhcTracking
 # Custom functions defined in external file:
 from analysisFunctions import (goodEvent, zPlaneArr, extendHits, distFit,
     crossAllPlanes, indexStationsHit, sortHitStation, testClusterProblem, customFitStatus)
-from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist, diffHist, allPlanesGauss
+from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist, diffHist, allPlanesGauss, diffPosHist
 
 # Script options:
 displayTrack = False # Display 2d/3d track + fit plots of individual events.
@@ -41,7 +41,7 @@ options = parser.parse_args()
 rootFile = ROOT.TFile.Open(options.path+options.inputFile)
 geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
 
-#Global variables definitions:
+# Global variables definitions:
 lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
 lsOfGlobals.Add(geo.modules['Scifi']) # only look at SciFi events
 
@@ -73,6 +73,8 @@ for testStationNum in testStationArr:
 
     horDiffArr = []
     verDiffArr = []
+    horPosArr = []
+    verPosArr = []
     # Loop over the individual events:
     for sTree in eventTree: # sTree == single tree for one event
         # 1: Select events with given number of stations hit:
@@ -102,18 +104,21 @@ for testStationNum in testStationArr:
 
                 # Append for histograms: (nPlanes after chi2 selection?)
                 chi2_nDfArr.append(chi2_nDf)
-                nPlanesHit.append(len(indexStationsHit(eventTree)))
+                
 
                 # 3: Select only low chi2 tracks: good fit and no secondary events    
                 if chi2_nDf<30: # display 3d trajectories with condition
+                    nPlanesHit.append(len(indexStationsHit(eventTree)))
                     if fitReducedStations:
                         # Compute difference between hits and fit:
                         fitHits = extendHits(fittedTrack=fit, zArr=zArr)
-                        horDiff, verDiff = distFit(fitHits=fitHits, clusterArr=trackTask.clusters, testStationNum=testStationNum)
+                        horDiff, verDiff, horPos, verPos= distFit(fitHits=fitHits, clusterArr=trackTask.clusters, testStationNum=testStationNum)
                         if horDiff != 1000: # Don't append missing hits
                             horDiffArr.append(horDiff)
+                            horPosArr.append(horPos)
                         if verDiff != 1000:
                             verDiffArr.append(verDiff)
+                            verPosArr.append(verPos)
 
                     if displayTrack:                  
                         arrPosStart = []
@@ -140,8 +145,18 @@ for testStationNum in testStationArr:
     if fitReducedStations:
         resultFit = diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr, stationNum=testStationNum)
         gaussFitArr.append(resultFit)
+        diffPosHist(
+            diffArr = verDiffArr,
+            posArr = verPosArr,
+            isVetical = True,
+            testStationNum = testStationNum)
+        diffPosHist(
+            diffArr = horDiffArr,
+            posArr = horPosArr,
+            isVetical = False,
+            testStationNum = testStationNum)
     chi2Hist(chi2_nDfArr=chi2_nDfArr, stationNum=testStationNum)
-    # planesHist(nPlanesHit=nPlanesHit)
+    #planesHist(nPlanesHit=nPlanesHit)
     print(f'Test station: {testStationNum}')
 
 if fitReducedStations:

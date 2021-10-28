@@ -221,7 +221,7 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 def chi2Hist(chi2_nDfArr, stationNum=0):
     '''Chi2/nDOF histogram.'''
     binsArr = np.linspace(0,40,400)
-    fig, ax = plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
+    fig, ax = plt.subplots(figsize=(8,6), dpi=300, tight_layout=True)
     ax.hist(chi2_nDfArr, bins=binsArr)
     ax.set_xlim(left=0.0,right=40)
     plt.xlabel('chi2/dof')
@@ -232,10 +232,12 @@ def chi2Hist(chi2_nDfArr, stationNum=0):
 
 def planesHist(nPlanesHit):
     '''Historam of number of planes hit.'''
-    fig, ax = plt.subplots(figsize=(6,8), dpi=300, tight_layout=True)
-    ax.hist(nPlanesHit)
+    fig, ax = plt.subplots(figsize=(5,5), dpi=300, tight_layout=True)
+    binsArr = np.linspace(2,11,10)
+    ax.hist(nPlanesHit,bins=binsArr)
     plt.xlabel('Number of planes hit')
     plt.ylabel('Number of events')
+    plt.savefig(f'figures/nPlanesHist.png')
     plt.show()
     plt.close()
 
@@ -375,4 +377,44 @@ def allPlanesGauss(fitArr):
     plt.savefig('figures/FullStationsDiff.png')
     plt.show()
 
+    plt.close()
+
+def diffPosHist(diffArr, posArr, isVetical, testStationNum):
+    fig, ax = plt.subplots(figsize=(12,8),dpi=500)
+
+    plt.rcParams.update({'font.size': 10})
+    if isVetical:
+        verHorStr = 'vertical'
+        biny = np.linspace(-50,-5,90)
+    else:
+        verHorStr = 'horizontal'
+        biny = np.linspace(15,60,90)
+    # fig.suptitle(f'Residual and position,{verHorStr} test station {testStationNum}.',
+    #          fontsize='large',
+    #          fontweight='bold')
+    xMin = -0.25
+    xMax = 0.25
+    yMin = -40
+    yMax = 40
+    nBins = [60,30]
+    binx = np.linspace(-0.25,0.25,50)
+    
+    
+    plt.hist2d(
+        diffArr,
+        posArr,
+        bins = [binx,biny],
+        #range = [[xMin,xMax],[yMin,yMax]],
+        cmap = plt.get_cmap('gist_heat_r'))
+
+    cbar = plt.colorbar()
+    cbar.ax.set_ylabel('Number of events')
+    if isVetical:
+        plt.xlabel('X offset [cm]')
+        plt.ylabel('X cluster position [cm]')
+    else:
+        plt.xlabel('Y offset [cm]')
+        plt.ylabel('Y cluster position [cm]')
+    plt.savefig(f'figures/diffPosHist_{testStationNum}_{verHorStr}.png')
+    #plt.show()
     plt.close()

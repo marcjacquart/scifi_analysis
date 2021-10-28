@@ -157,7 +157,7 @@ def distFit(fitHits, clusterArr, testStationNum):
         if (cluster.GetFirst()//1000000) == testStationNum:
             A,B = ROOT.TVector3(),ROOT.TVector3()
             cluster.GetPosition(A,B)
-            if ((cluster.GetFirst()//100000) % 2 ) == 0:
+            if ((cluster.GetFirst()//100000) % 2 ) == 0: # horizontal
                 #print(f'Test must be 0: {A[1]-B[1]}')
                 horClusters.append(A[1])
             else:
@@ -169,9 +169,11 @@ def distFit(fitHits, clusterArr, testStationNum):
     # We want the differece (no abs) of the closest point(in absolute diff)
     horDiffIndex = np.argmin([abs(x - horFit) for x in horClusters]) # Minimal distance
     verDiffIndex = np.argmin([abs(y - verFit) for y in verClusters])
-    horDiff = horClusters[horDiffIndex] - horFit
-    verDiff = verClusters[verDiffIndex] - verFit
-    return horDiff, verDiff
+    horPos = horClusters[horDiffIndex]
+    verPos = verClusters[verDiffIndex]
+    horDiff = horPos - horFit
+    verDiff = verPos - verFit
+    return horDiff, verDiff, horPos , verPos
 
 def testClusterProblem(eventTree):
     ''' Test for cluster separated by only one unactivated SiPM channel'''
