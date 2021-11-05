@@ -30,8 +30,12 @@ class HandlerColormap(HandlerBase):
         return stripes
 
 
-def valueToColor(value, cmap_name='nipy_spectral', vmin=-17.1, vmax=22):
-    '''Colormap from z coordinate to distinguish between SciFi planes.'''
+def valueToColor(value, cmap_name='nipy_spectral', vmin=-171, vmax=220):
+    '''
+    Colormap from z coordinate to distinguish between SciFi planes.
+    v_min, v_max: color range value in mm.
+    '''
+    
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     cmap = matplotlib.cm.get_cmap(cmap_name)
     rgb = cmap(norm(abs(value)))[:3]  # rgba[:3] -> rgb
@@ -51,6 +55,7 @@ def extendedFitArr(trackTask, fitHits):
     # trackTask.event.fittedTracks are filled with the fitTrack() function
     for aTrack in trackTask.event.fittedTracks:
         for i in range(aTrack.getNumPointsWithMeasurement()):
+
             state = aTrack.getFittedState(i)
             pos = state.getPos()
             fitArr.append(pos)
@@ -69,9 +74,17 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
     Uses matplotlib to display a 3d plot of the track, the fit and missing hits.
     '''
-
-    fig= plt.figure(figsize = (10, 7))
+    print(fitHits)
+    fig= plt.figure(figsize = (7.5, 6),dpi=500, tight_layout=True)
     ax = plt.axes(projection="3d")
+
+    fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
+    
+    # cm to mm conversion *10:
+    arrPosStart = [10 * element for element in arrPosStart]
+    arrPosStop = [10 * element for element in arrPosStop]
+    fitArr = [10 * element for element in fitArr]
+    fitHits = [10 * element for element in fitHits]
 
     for hitNumber in range(len(arrPosStart)):
         ax.plot(
@@ -82,7 +95,6 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
             # RGB format to color different Scifi planes
             color = valueToColor(abs(arrPosStart[hitNumber][2])) )
 
-    fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
     ax.plot(
         xs = [element[0] for element in fitArr], 
         ys = [element[1] for element in fitArr],
@@ -98,9 +110,9 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
         marker = '^',
         label = 'Missed hits')
 
-    ax.set_xlabel('x [cm]')
-    ax.set_ylabel('y [cm]')
-    ax.set_zlabel('z [cm]')
+    ax.set_xlabel('x [mm]')
+    ax.set_ylabel('y [mm]')
+    ax.set_zlabel('z [mm]')
     
     # Legend fields before adding custom entery.
     handles, labels = ax.get_legend_handles_labels()
@@ -110,7 +122,7 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
     cmap = plt.cm.nipy_spectral_r
     cmap_handles = [Rectangle((0, 0), 1, 1)]
     handler_rainbow = dict(zip(cmap_handles, [HandlerColormap(cmap)]))
-    label_rainbow = ['Fiber clusters']
+    label_rainbow = ['Channel clusters']
 
     # Append new entery to legend and display it.
     # handles.append(cmap_handles)
@@ -129,6 +141,7 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
         handler_map = handler_rainbow)
     plt.gca().add_artist(legend1)
     plt.gca().add_artist(legend2)
+    plt.savefig('figures/3d.png')
     plt.show()
     plt.close()
 
@@ -162,11 +175,20 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
     fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
 
-    fig, (ax1, ax2) = plt.subplots(2)
-    fig.set_size_inches(8, 8)
-    fig.suptitle(f'Track 2d projections',
-                 fontsize='x-large',
-                 fontweight='bold')
+    fig, (ax1, ax2) = plt.subplots(2,figsize = (5,7),dpi=500, tight_layout=True)
+    ax1.grid(axis = 'y')
+    ax2.grid(axis = 'y')
+    #fig.set_size_inches(5, 8)
+    # fig.suptitle(f'Track 2d projections',
+    #              fontsize='x-large',
+    #              fontweight='bold')
+
+    # cm to mm *10 conversion:
+    horStart = [10 * element for element in horStart]
+    horStop = [10 * element for element in horStop]
+    verStart = [10 * element for element in verStart]
+    fitArr = [10 * element for element in fitArr]
+    verStop = [10 * element for element in verStop]    
 
     # z-x plane:
     # Horizontal fibers are lines in this plane
@@ -191,8 +213,9 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
         [vect[0] for vect in fitArr],
         color = 'r',
         label = 'Fit')
-    ax1.set_xlabel('z [cm]')
-    ax1.set_ylabel('x [cm]')
+    ax1.set_xlabel('z [mm]')
+    ax1.set_ylabel('x [mm]')
+   
     ax1.legend()
     # y-z plane:
     # Vertical fibers are lines in this plane
@@ -212,8 +235,10 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
         [vect[2] for vect in fitArr],
         [vect[1] for vect in fitArr],
         color = 'r')
-    ax2.set_xlabel('z [cm]')
-    ax2.set_ylabel('y [cm]')
+    ax2.set_xlabel('z [mm]')
+    ax2.set_ylabel('y [mm]')
+
+    plt.savefig('figures/2d.png')
     plt.show()
     plt.close()
 
@@ -221,7 +246,7 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 def chi2Hist(chi2_nDfArr, stationNum=0):
     '''Chi2/nDOF histogram.'''
     binsArr = np.linspace(0,40,400)
-    fig, ax = plt.subplots(figsize=(8,6), dpi=300, tight_layout=True)
+    fig, ax = plt.subplots(figsize=(8,6), dpi=500, tight_layout=True)
     ax.hist(chi2_nDfArr, bins=binsArr)
     ax.set_xlim(left=0.0,right=40)
     plt.xlabel('chi2/dof')
@@ -232,7 +257,7 @@ def chi2Hist(chi2_nDfArr, stationNum=0):
 
 def planesHist(nPlanesHit):
     '''Historam of number of planes hit.'''
-    fig, ax = plt.subplots(figsize=(5,5), dpi=300, tight_layout=True)
+    fig, ax = plt.subplots(figsize=(5,5), dpi=500, tight_layout=True)
     binsArr = np.linspace(2,11,10)
     ax.hist(nPlanesHit,bins=binsArr)
     plt.xlabel('Number of planes hit')
@@ -252,19 +277,24 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
     the hit on th 5th one. Gaussian fit.
     Return [x0, err_x0, sigma, err_sigma] of gaussian fit.
     '''
+    # conversion cm in mm *10:
+    horDiffArr = [10 * element for element in horDiffArr]
+    verDiffArr = [10 * element for element in verDiffArr]
 
     fig, (ax1, ax2) = plt.subplots(2)
+    ax1.grid(axis = 'y')
+    ax2.grid(axis = 'y')
     fig.set_size_inches(8, 8)
     fig.suptitle(f'Difference between hit and fit, test station {stationNum}.',
                  fontsize='x-large',
                  fontweight='bold')
-    binsArr = np.linspace(-0.25,0.25,500)
+    binsArr = np.linspace(-2.5,2.5,500)
     hist1n, hist1Bins, hist1Patches = ax1.hist(verDiffArr, bins=binsArr)
-    ax1.set_xlabel(r'$\Delta$ x [cm]')
+    ax1.set_xlabel(r'$\Delta$ x [mm]')
     ax1.set_ylabel('Number of events')
 
     hist2n, hist2Bins, hist2Patches = ax2.hist(horDiffArr, bins=binsArr)
-    ax2.set_xlabel(r'$\Delta$ y [cm]')
+    ax2.set_xlabel(r'$\Delta$ y [mm]')
     ax2.set_ylabel('Number of events')
 
     diff = hist1Bins[1] - hist1Bins[0]
@@ -284,8 +314,8 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
             sigma = param1[2]) 
             for i in range(len(binCenters))],
         color = 'r',
-        label = (f'Gaussian fit: x0 = {param1[1]:.2} ± {errX01:.2}'
-               + f'\n                     sigma = {abs(param1[2]):.2} ± {errSigma1:.2}'))
+        label = (f'Gaussian fit: x0 = ({param1[1]:.2} ± {errX01:.2}) mm'
+               + f'\n                     sigma = ({abs(param1[2]):.2} ± {errSigma1:.2}) mm'))
     ax1.legend()
 
     param2, cov2 = curve_fit(f=gauss, xdata=binCenters, ydata = hist2n)
@@ -301,11 +331,12 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
             sigma = param2[2]) 
             for i in range(len(binCenters))],
         color = 'r',
-        label = (f'Gaussian fit: x0 = {param2[1]:.2} ± {errX02:.2}'
-               + f'\n                     sigma = {abs(param2[2]):.2} ± {errSigma2:.2}'))
+        label = (f'Gaussian fit: x0 = ({param2[1]:.2} ± {errX02:.2}) mm'
+               + f'\n                     sigma = ({abs(param2[2]):.2} ± {errSigma2:.2}) mm'))
     ax2.legend()
     plt.savefig(f'figures/diffHistGauss_testStation{stationNum}.png')
     #plt.show()
+
     plt.close()
     # Sigma can be fitted negative, but return abs() by convention.
     resultFit = [param1[1], errX01, abs(param1[2]), errSigma1, param2[1], errX02, abs(param2[2]), errSigma2]
@@ -315,17 +346,18 @@ def allPlanesGauss(fitArr):
     '''
     Global plot for the 5 test stations.
     '''
+    # fitArr already in mm
     stationsArr = [1,2,3,4,5]
     zeroArr = [0,0,0,0,0]
     # Extract data from array: See order of return of diffHist()
     x0_x = [x[0] for x in fitArr]
-    err_x0_x = [10 * x[1] for x in fitArr]
+    err_x0_x = [x[1] for x in fitArr]
     sigma_x = [x[2] for x in fitArr]
-    err_sigma_x = [10 * x[3] for x in fitArr]
+    err_sigma_x = [x[3] for x in fitArr]
     x0_y = [x[4] for x in fitArr]
-    err_x0_y = [10 * x[5] for x in fitArr]
+    err_x0_y = [x[5] for x in fitArr]
     sigma_y = [x[6] for x in fitArr]
-    err_sigma_y = [10 * x[7] for x in fitArr]
+    err_sigma_y = [x[7] for x in fitArr]
 
     fig, ((ax1, ax3),(ax2, ax4)) = plt.subplots(
         nrows = 2,
@@ -368,53 +400,122 @@ def allPlanesGauss(fitArr):
         ls = '',
         marker = 'x',
         markeredgecolor = 'k')
-    ax1.set_ylabel('X offset [cm]')
-    ax2.set_ylabel(r'$\sigma_x$ [cm]')
-    ax3.set_ylabel('Y offset [cm]')
-    ax4.set_ylabel(r'$\sigma_y$ [cm]')
+    ax1.set_ylabel('X offset [mm]')
+    ax2.set_ylabel(r'$\sigma_x$ [mm]')
+    ax3.set_ylabel('Y offset [mm]')
+    ax4.set_ylabel(r'$\sigma_y$ [mm]')
     ax2.set_xlabel('Test station')
     ax4.set_xlabel('Test station')
+    ax1.set_ylim(bottom = -0.7, top = 0.7)
+    ax3.set_ylim(bottom = -0.7, top = 0.7)
+    ax2.set_ylim(bottom = 0.05, top = 0.35)
+    ax4.set_ylim(bottom = 0.05, top = 0.35)
+    ax1.grid()
+    ax2.grid()
+    ax3.grid()
+    ax4.grid()
     plt.savefig('figures/FullStationsDiff.png')
     plt.show()
-
     plt.close()
 
-def diffPosHist(diffArr, posArr, isVetical, testStationNum):
-    fig, ax = plt.subplots(figsize=(12,8),dpi=500)
+def diffPosHist(posArr, diffArr, binsPos, labels, fileName, isCrossed):
+    '''
+    Difference fit-hit versus position on plane histogram.
+    diffArr, posArr, binsPos must be given in cm, conversion in mm inside function.
+    '''
+
+    fig, ax = plt.subplots(figsize=(8,6),dpi=500,tight_layout=True)
 
     plt.rcParams.update({'font.size': 10})
-    if isVetical:
-        verHorStr = 'vertical'
-        biny = np.linspace(-50,-5,90)
-    else:
-        verHorStr = 'horizontal'
-        biny = np.linspace(15,60,90)
+
+    # cm to mm conversion *10:
+    diffArr = [10 * element for element in diffArr]
+    posArr = [10 * element for element in posArr]
+    binsPos = [10 * element for element in binsPos]
+
     # fig.suptitle(f'Residual and position,{verHorStr} test station {testStationNum}.',
     #          fontsize='large',
     #          fontweight='bold')
-    xMin = -0.25
-    xMax = 0.25
-    yMin = -40
-    yMax = 40
+    yMin = -2.5
+    yMax = 2.5
+    xMin = -400
+    xMax = 400
     nBins = [60,30]
-    binx = np.linspace(-0.25,0.25,50)
-    
+    if isCrossed: # Difference in y axis for better horizontal fit.
+        binx = binsPos
+        biny = np.linspace(-2.5,2.5,50)
+        xHist = posArr
+        yHist = diffArr
+    else:
+        binx = np.linspace(-2.5,2.5,50)
+        biny = binsPos
+        xHist = diffArr
+        yHist = posArr
     
     plt.hist2d(
-        diffArr,
-        posArr,
+        xHist,
+        yHist,
         bins = [binx,biny],
-        #range = [[xMin,xMax],[yMin,yMax]],
         cmap = plt.get_cmap('gist_heat_r'))
 
     cbar = plt.colorbar()
     cbar.ax.set_ylabel('Number of events')
-    if isVetical:
-        plt.xlabel('X offset [cm]')
-        plt.ylabel('X cluster position [cm]')
-    else:
-        plt.xlabel('Y offset [cm]')
-        plt.ylabel('Y cluster position [cm]')
-    plt.savefig(f'figures/diffPosHist_{testStationNum}_{verHorStr}.png')
+
+    # Linear fit for rotation offset:
+    if isCrossed:
+        linFitModel, cov = np.polyfit(posArr, diffArr, 1,cov = True) # Compute slope and intercept
+        linFitFunc = np.poly1d(linFitModel) # Make the line equation
+        print(cov)
+        #print(linFitModel)
+        ax.plot(
+            binx,
+            linFitFunc(binx),
+            color = 'b',
+            label = f'Slope: {np.format_float_scientific(linFitModel[0], precision = 2,)}±{np.format_float_scientific(np.sqrt(cov[0][0]), precision = 2,)}')
+        plt.legend()
+    plt.xlabel(labels[0])
+    plt.ylabel(labels[1])
+    
+    plt.savefig(f'figures/{fileName}.png')
     #plt.show()
     plt.close()
+    if isCrossed:
+        return linFitModel[0], np.sqrt(cov[0][0]) # Return slope and its uncertainty.
+
+def rotationAngle(xPosyOff_Slope, xPosyOff_SlopeErr, yPosxOff_Slope, yPosxOff_SlopeErr):
+    x1 = [0.95, 1.95, 2.95, 3.95, 4.95]
+    x2 = [1.05, 2.05, 3.05, 4.05, 5.05]
+    zeroes = [0, 0, 0, 0, 0]
+
+    fig, ax = plt.subplots(figsize=(8,6),dpi=500,tight_layout=True)
+    # Both plane slopes must be the same in absolute value.
+    xPosyOff_Slope = [abs(element) for element in xPosyOff_Slope]
+    yPosxOff_Slope = [abs(element) for element in yPosxOff_Slope]
+    ax.errorbar(
+        x = x1,
+        y = xPosyOff_Slope,
+        xerr = zeroes,
+        yerr = xPosyOff_SlopeErr,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'b',
+        label = 'X position, Y offset')
+
+    ax.errorbar(
+        x = x2,
+        y = yPosxOff_Slope,
+        xerr = zeroes,
+        yerr = yPosxOff_SlopeErr,
+        ls = '',
+        marker = 'x',
+        markeredgecolor = 'r',
+        label = 'Y position, X offset')
+
+    ax.grid(axis = 'y')
+    plt.tick_params(bottom=False)
+    plt.xlabel('Station number')
+    plt.ylabel('Relative rotation angle [rad]')
+    plt.legend()
+    plt.savefig('figures/angles.png')
+    plt.close()
+    

@@ -1,6 +1,8 @@
 # To launch:
 # python3 efficiency.py -p /eos/experiment/sndlhc/testbeam/scifi/sndsw/ -f sndsw_raw_000001.root -g geofile_full.Ntuple-TGeant4.root
 
+# Create a "figures" folder where the script is executed to save them all here.
+
 # This script:
 #    - Import the raw data and geomery files
 #    - Use the geometry to compute cluster positions
@@ -22,19 +24,38 @@ import SndlhcGeo
 import SndlhcTracking
 # Custom functions defined in external file:
 from analysisFunctions import (goodEvent, zPlaneArr, extendHits, distFit,
-    crossAllPlanes, indexStationsHit, sortHitStation, testClusterProblem, customFitStatus)
-from plotFunctions import display3dTrack, display2dTrack, chi2Hist, planesHist, diffHist, allPlanesGauss, diffPosHist
+    crossAllPlanes, indexStationsHit, sortHitStation, testClusterProblem, 
+    customFitStatus)
+from plotFunctions import (display3dTrack, display2dTrack, chi2Hist, 
+    planesHist, diffHist, allPlanesGauss, diffPosHist, rotationAngle)
 
 # Script options:
 displayTrack = False # Display 2d/3d track + fit plots of individual events.
 fitReducedStations = True # True to loop 4-fit, 1-test, False to fit with 5 stations.
+needXYInfo = True # both vertical and horizontal planes must be hit (for rotation)
 # /!\ Be careful to select 5 stations with goodEvent() if fitReducedStations = True
+
 
 # Paths+name of the data and geometry root files as script arguments:
 parser = ArgumentParser()
-parser.add_argument("-p", "--path", dest="path", help="run number",required=True,default="")
-parser.add_argument("-f", "--inputFile", dest="inputFile", help="input root file",default="",required=True)
-parser.add_argument("-g", "--geoFile", dest="geoFile", help="geometry file", required=True)
+parser.add_argument(
+    "-p", 
+    "--path", 
+    dest = "path", 
+    help = "run number",
+    required = True,default="")
+parser.add_argument(
+    "-f", 
+    "--inputFile", 
+    dest = "inputFile", 
+    help = "input root file",
+    default = "",required=True)
+parser.add_argument(
+    "-g", 
+    "--geoFile", 
+    dest = "geoFile", 
+    help = "geometry file", 
+    required = True)
 options = parser.parse_args()
 
 # Open root and geometry files:
@@ -56,7 +77,14 @@ trackTask.InitTask(eventTree)
 nav = ROOT.gGeoManager.GetCurrentNavigator()
 
 # z positions of the planes, array of 10 float
-zArr = zPlaneArr(eventTree=eventTree, geo=geo)
+zArr = zPlaneArr(eventTree = eventTree, geo = geo)
+
+# For rotation plot:
+if needXYInfo:
+    xPosyOff_Slope = []
+    xPosyOff_SlopeErr = []
+    yPosxOff_Slope = []
+    yPosxOff_SlopeErr = []
 
 
 if fitReducedStations:
@@ -78,21 +106,26 @@ for testStationNum in testStationArr:
     # Loop over the individual events:
     for sTree in eventTree: # sTree == single tree for one event
         # 1: Select events with given number of stations hit:
-        if goodEvent(eventTree = eventTree, nStations = 5, allowMore = True):
-            # testClusterProblem(eventTree = sTree) # Display the cluster spacing
-            fit, fitStatus = customFitStatus(trackTask=trackTask, FitStations=fitStationsArr[testStationNum-1])
-            # Extend the fit crossing point to all the planes:
-            fitHits = extendHits(fittedTrack=fit, zArr=zArr)
+        if goodEvent(eventTree = eventTree, nStations = 5, allowMore = False):
+            # testClusterProblem(eventTree = sTree) # Test cluster spacing
+            fit, fitStatus = customFitStatus(
+                trackTask = trackTask, 
+                FitStations = fitStationsArr[testStationNum-1])
 
-            # 2: Select only trajectory crossing all the planes, use fit on all hits:
-            if crossAllPlanes(fitHitsArr=fitHits, geo=geo, verbose=False):
+            # Extend the fit crossing point to all the planes:
+            fitHitsExt = extendHits(fittedTrack = fit, zArr = zArr)
+
+            # 2: Select only events with trajectory crossing all the planes:
+            if crossAllPlanes(fitHitsArr = fitHitsExt, geo = geo):
                 
                 indexHitArr = indexStationsHit(eventTree = eventTree)
-                hitsMissed = [ROOT.TVector3(x[0],x[1],x[2]) for x in fitHits] # Copy values, not pointers
+                # Copy values, not pointers
+                hitsMissed = [ROOT.TVector3(x[0],x[1],x[2]) for x in fitHitsExt]
                 for index in indexHitArr:
                     # Remove the coordinate of the planes hit,
                     # only the coordinates of the missed hits remains.
-                    hitsMissed[index] = ROOT.TVector3(-1.68283565985,0,0) # Flag to remove
+                    # -1.68283565985: Flag to remove the events
+                    hitsMissed[index] = ROOT.TVector3(-1.68283565985,0,0)
                 hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
 
                 # Chi2:
@@ -100,35 +133,45 @@ for testStationNum in testStationArr:
                     chi2_nDf = -1  # Impossible value to put them aside
                 else: 
                     chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
-                    
 
                 # Append for histograms: (nPlanes after chi2 selection?)
                 chi2_nDfArr.append(chi2_nDf)
                 
 
-                # 3: Select only low chi2 tracks: good fit and no secondary events    
-                if chi2_nDf<30: # display 3d trajectories with condition
+                # 3: Select low chi2 tracks: good fit and no secondary events.   
+                # Exception: unhandled, unknown C++ exception" When dof=0, 
+                # also need to filter that (throw chi2_nDf = -1 cases).
+                if chi2_nDf<30 and chi2_nDf>=0:
                     nPlanesHit.append(len(indexStationsHit(eventTree)))
                     if fitReducedStations:
                         # Compute difference between hits and fit:
-                        fitHits = extendHits(fittedTrack=fit, zArr=zArr)
-                        horDiff, verDiff, horPos, verPos= distFit(fitHits=fitHits, clusterArr=trackTask.clusters, testStationNum=testStationNum)
-                        if horDiff != 1000: # Don't append missing hits
-                            horDiffArr.append(horDiff)
-                            horPosArr.append(horPos)
-                        if verDiff != 1000:
-                            verDiffArr.append(verDiff)
-                            verPosArr.append(verPos)
+                        #fitHits = extendHits(fittedTrack=fit, zArr=zArr)
+                        horDiff, verDiff, horPos, verPos= distFit(
+                            fitHits = fitHitsExt,
+                            clusterArr = trackTask.clusters,
+                            testStationNum = testStationNum)
+                        if needXYInfo:
+                            if abs(horDiff) <1 and abs(verDiff) <1:
+                                horDiffArr.append(horDiff)
+                                horPosArr.append(horPos)
+                                verDiffArr.append(verDiff)
+                                verPosArr.append(verPos)
+                        else:
+                            if horDiff <1: # Don't append missing hits
+                                horDiffArr.append(horDiff)
+                                horPosArr.append(horPos)
+                            if verDiff <1:
+                                verDiffArr.append(verDiff)
+                                verPosArr.append(verPos)
 
                     if displayTrack:                  
                         arrPosStart = []
                         arrPosStop = []
-
                         for cluster in trackTask.clusters:
-                            # A: beginning, B: end of the activated scintillating bar.
+                            # A: beginning, B: end of the scintillating bar.
                             A,B = ROOT.TVector3(),ROOT.TVector3()
-                            cluster.GetPosition(A,B) # Fill A and B directly with position.
-                            # hit.isVertical(): True if vertical fibers measuring x coord.
+                            # Fill A and B directly with position:
+                            cluster.GetPosition(A,B)
                             arrPosStart.append(A)            
                             arrPosStop.append(B)
                         display3dTrack(
@@ -143,18 +186,49 @@ for testStationNum in testStationArr:
                             fitHits = hitsMissed)
 
     if fitReducedStations:
-        resultFit = diffHist(horDiffArr=horDiffArr, verDiffArr=verDiffArr, stationNum=testStationNum)
-        gaussFitArr.append(resultFit)
+        resultFit = diffHist(
+            horDiffArr = horDiffArr,
+            verDiffArr = verDiffArr,
+            stationNum = testStationNum)
+        gaussFitArr.append(resultFit) # in mm since diffHist() output changed
+
+        # Difference between hit and fit vs position within the same plane:
         diffPosHist(
-            diffArr = verDiffArr,
             posArr = verPosArr,
-            isVetical = True,
-            testStationNum = testStationNum)
+            diffArr = verDiffArr,
+            binsPos = np.linspace(-50,-5,90),
+            fileName = f'OFFSET_ver_testSta{testStationNum}',
+            labels = ['X cluster position [mm]', 'X offset [mm]'],
+            isCrossed = False)
         diffPosHist(
-            diffArr = horDiffArr,
             posArr = horPosArr,
-            isVetical = False,
-            testStationNum = testStationNum)
+            diffArr = horDiffArr,
+            binsPos = np.linspace(15,60,90),
+            fileName = f'OFFSET_hor_testSta{testStationNum}',
+            labels = ['Y cluster position [mm]', 'X offset [mm]'],
+            isCrossed = False)
+        if needXYInfo: # If only hit one plane, x and y don't have same dimensions.
+            # Cross terms to check rotations
+            slope, slopeErr = diffPosHist(
+                posArr = verPosArr,
+                diffArr = horDiffArr,
+                binsPos = np.linspace(-50,-5,90),
+                fileName = f'ROT_horDiff_verPos_testSta{testStationNum}',
+                labels = ['X cluster position [mm]', 'Y offset [mm]'],
+                isCrossed = True)
+            xPosyOff_Slope.append(slope)
+            xPosyOff_SlopeErr.append(slopeErr)
+
+            slope, slopeErr = diffPosHist(
+                posArr = horPosArr,
+                diffArr = verDiffArr,
+                binsPos = np.linspace(15,60,90),
+                fileName = f'ROT_verDiff_horPos_testSta{testStationNum}',
+                labels = ['Y cluster position [mm]', 'X offset [mm]'],
+                isCrossed = True)
+            yPosxOff_Slope.append(slope)
+            yPosxOff_SlopeErr.append(slopeErr)
+
     chi2Hist(chi2_nDfArr=chi2_nDfArr, stationNum=testStationNum)
     #planesHist(nPlanesHit=nPlanesHit)
     print(f'Test station: {testStationNum}')
@@ -162,4 +236,9 @@ for testStationNum in testStationArr:
 if fitReducedStations:
     allPlanesGauss(fitArr=gaussFitArr)
 
-    
+if needXYInfo:
+    rotationAngle(
+    xPosyOff_Slope = xPosyOff_Slope,
+    xPosyOff_SlopeErr = xPosyOff_SlopeErr,
+    yPosxOff_Slope = yPosxOff_Slope,
+    yPosxOff_SlopeErr = yPosxOff_SlopeErr)

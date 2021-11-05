@@ -31,13 +31,17 @@ def indexStationsHit(eventTree):
     stations = {} 
     for detectedHit in eventTree.Digi_ScifiHits:
         detID = detectedHit.GetDetectorID()
+
         planeNumber = (detID // 1000000 - 1) * 2  + (detID // 100000) % 2
         stations[detID//100000] = planeNumber
+        # if planeNumber == 9:
+        #     print(detID)
     
     # Fill array to return from dict values:
     indexHitArr = [] 
     for planeID in stations.values():
         indexHitArr.append(planeID)
+    #print(f'indexHitArr:{indexHitArr}')
     return indexHitArr
 
 
