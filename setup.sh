@@ -36,4 +36,4 @@ echo "Alienv uses sndsw/latest-release folder."
 echo "Replace the setup.sh last command with output above if cannot enter alienv"
 #Replace the one below:
 alienv enter sndsw/latest-master-release
-
+cd ..
