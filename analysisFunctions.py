@@ -1,4 +1,3 @@
-
 import ROOT
 import numpy as np
 
@@ -34,19 +33,22 @@ def indexStationsHit(eventTree):
 
         planeNumber = (detID // 1000000 - 1) * 2  + (detID // 100000) % 2
         stations[detID//100000] = planeNumber
-        # if planeNumber == 9:
-        #     print(detID)
     
     # Fill array to return from dict values:
     indexHitArr = [] 
     for planeID in stations.values():
         indexHitArr.append(planeID)
-    #print(f'indexHitArr:{indexHitArr}')
     return indexHitArr
 
 
 def extendHits(fittedTrack, zArr):
-    '''Extend the fit position to include missing planes hit'''
+    '''
+    Extend the fit position to include missing planes hits.
+    fittedTrack: ROOT.genfit.Track, obtained with customFitStatus()
+    zArr: array containing z position (float) of each plane. 
+    Return array of 10 TVector3, aech containing the fit intersection
+    with one plane.
+    '''
     fitHits =[ROOT.TVector3()]*10 # Points where fit crosses the 10 planes.
     # for i in range(fittedTrack.getNumPointsWithMeasurement()):
     # Only the first can be used, other hits give same line
@@ -61,6 +63,12 @@ def extendHits(fittedTrack, zArr):
 
 
 def crossAllPlanes(fitHitsArr,geo, verbose=False):
+    '''
+    Return true if fit is within the detector boundaries.
+    Tell where the fit exit the detector if verbose activated
+    fitHitsArr: coordinates of fit-plane intersection from extendHits().
+    geo: SndlhcGeo.GeoInterface(<geometry file>) for detector boundaries.
+    '''
     isInside = True # Set to False if only once out of bounds
     A,B = ROOT.TVector3(),ROOT.TVector3()
 
@@ -100,9 +108,15 @@ def crossAllPlanes(fitHitsArr,geo, verbose=False):
 
 
 def zPlaneArr(eventTree,geo):
+    '''
+    Return array with the 10 z coordinates of the planes.
+    format: [1hor, 1ver, 2hor, ...,5hor, 5ver]
+    /!\ THIS ASSUME Z FIX FOR ALL THE PLANE!
+    geo: SndlhcGeo.GeoInterface(<geometry file>) for planes positions.
+    eventTree: event list to get one event crossing all planes 
+    to get each plane position.
+    '''
     zArr = [0,0,0,0,0,0,0,0,0,0] # Fill Z coordinate of the planes
-    # format: [1hor, 1ver, 2hor, ...,5hor, 5ver]
-    # /!\ THIS ASSUME Z FIX FOR ALL THE PLANE!
     # Warning message if z values > epsilon for different SiPM of same plane
     epsilon = 0.0001 
 
@@ -121,13 +135,13 @@ def zPlaneArr(eventTree,geo):
                     print(f'WARNING: SciFi planes {indexArr} not aligned in Z direction!')
                 zArr[indexArr] = zVal # Fill z array
             break
-    #print(f'zArr: {zArr}')
     return zArr
 
 def sortHitStation(clusterArr,stationArr):
     '''
-    return the array of hits from hitArr that belongs
-    to one of the stations from stationArr
+    return the array of clusters from clusterArr that belong
+    to one of the selected stations of stationArr
+    stationArr: Array with selected stations number, ex: [1,3,4,5]
     '''
     
     clusFit = []
@@ -135,11 +149,9 @@ def sortHitStation(clusterArr,stationArr):
     for cluster in clusterArr:
         # If the cluster station is inside our list to fit:
         if (cluster.GetFirst()//1000000) in stationArr:
-            # print(f'{cluster.GetFirst()//1000000} is OK for fit!')
             clusFit.append(cluster)
         else:
             clusTest.append(cluster)
-            # print(f'{cluster.GetFirst()//1000000} is NOT ok for fit! Used to test')
     return clusFit, clusTest
 
 
@@ -151,6 +163,10 @@ def distFit(fitHits, clusterArr, testStationNum):
     (testStationNum) to compute the distance between the test station's
     hits and the predicted position by the fit on the same plane.
     Missing hits are set to 1000, easy to remove afterward.
+
+    fitHits: array of TVector3 plane-fit intersection from extendHits()
+    Return horizontal fit-hit difference, vertical fit-hit difference,
+    horizontal position of the selected hit, vertical position of the selected hit.
     '''
     horIndex = 2 * (testStationNum - 1)
     verIndex = horIndex +1
@@ -162,11 +178,9 @@ def distFit(fitHits, clusterArr, testStationNum):
             A,B = ROOT.TVector3(),ROOT.TVector3()
             cluster.GetPosition(A,B)
             if ((cluster.GetFirst()//100000) % 2 ) == 0: # horizontal
-                #print(f'Test must be 0: {A[1]-B[1]}')
                 horClusters.append(A[1])
             else:
                 verClusters.append(A[0])
-                #print(f'Test must be 0: {A[0]-B[0]}')
 
     horFit = fitHits[horIndex][1]
     verFit = fitHits[verIndex][0]
@@ -180,7 +194,12 @@ def distFit(fitHits, clusterArr, testStationNum):
     return horDiff, verDiff, horPos , verPos
 
 def testClusterProblem(eventTree):
-    ''' Test for cluster separated by only one unactivated SiPM channel'''
+    ''' 
+    Test for cluster separated by only one unactivated SiPM channel.
+    Print the result for easily see the neighboring clusters.
+    eventTree: Event list from root file.
+    return: None
+    '''
     print('##################')
     IDArr = []
     for hit in sTree.Digi_ScifiHits:
@@ -202,6 +221,7 @@ def customFitStatus(trackTask, FitStations):
     Do manually the trackTask.ExecuteTask() so it can use arbitrary number
     of stations for the fit.
     Return the fit and fit status object containing the fitted track.
+    stationArr: Array with selected stations number for the fit, ex: [1,3,4,5]
     '''
     trackTask.clusters = trackTask.scifiCluster() # Build cluster list
     clusFit, clusTest = sortHitStation(clusterArr=trackTask.clusters,stationArr=FitStations)
@@ -213,7 +233,7 @@ def customFitStatus(trackTask, FitStations):
         clusterID = x.GetFirst()
         dictEntery = {clusterID: x}
         clusDict.update(dictEntery)
-    fit = trackTask.fitTrack(hitlist=clusDict) # Type ROOT.genfit.Trac
+    fit = trackTask.fitTrack(hitlist=clusDict) # Type ROOT.genfit.Track
     fitStatus= fit.getFitStatus()
     trackTask.event.fittedTracks = [fit] # Array to keep sndsw format
     return fit, fitStatus

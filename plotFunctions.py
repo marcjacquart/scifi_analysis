@@ -34,6 +34,7 @@ def valueToColor(value, cmap_name='nipy_spectral', vmin=-171, vmax=220):
     '''
     Colormap from z coordinate to distinguish between SciFi planes.
     v_min, v_max: color range value in mm.
+    value: z plane value to set the color.
     '''
     
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
@@ -124,11 +125,6 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
     handler_rainbow = dict(zip(cmap_handles, [HandlerColormap(cmap)]))
     label_rainbow = ['Channel clusters']
 
-    # Append new entery to legend and display it.
-    # handles.append(cmap_handles)
-    # labels.append(label_rainbow)
-
-    # handler_map.update(handler_rainbow)
     legend1 = plt.legend(
         loc = 'upper right',
         handles = handles, 
@@ -147,22 +143,21 @@ def display3dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
 
 def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
+    '''
+    x-z and y-z 2d projections of the 3d track.
+    arrPosStart, arrPosStop: Array each containing one end of the event clusters.
+    trackTask: SndlhcTracking.Tracking() object containing the fit infos.
+    fitHits: Array of TVector3 of hits to display.
+    '''
     verStart = []
     verStop = []
     horStart = []
     horStop = []
-
-    #print('Verify cluster proxymity:')
-    for element in arrPosStart:
-        pass
-        #print(f'Start: x:{element[0]}, y:{element[1]}, z:{element[2]}')
-    #print('---------------------------')
     
     epsilon = 0.00001
     for i in range(len(arrPosStart)):
         delta = arrPosStart[i] - arrPosStop[i]
-        #print(f'Delta: x:{delta[0]}, y:{delta[1]}, z:{delta[2]}')
-        if delta[0] < epsilon: #/!\ Change the condition is geometry not aligned anymore.
+        if delta[0] < epsilon: #/!\ Change the condition if geometry not aligned anymore.
             verStart.append(arrPosStart[i])
             verStop.append(arrPosStop[i])
         elif delta[1] < epsilon:
@@ -173,15 +168,16 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
             print('Check geometry alignment or change hor/ver conditions.')
 
 
-    fitArr = extendedFitArr(trackTask=trackTask, fitHits=fitHits)
+    fitArr = extendedFitArr(trackTask = trackTask, fitHits = fitHits)
 
-    fig, (ax1, ax2) = plt.subplots(2,figsize = (5,7),dpi=500, tight_layout=True)
+    fig, (ax1, ax2) = plt.subplots(
+        2,
+        figsize = (5,7),
+        dpi = 500,
+        tight_layout = True)
+
     ax1.grid(axis = 'y')
     ax2.grid(axis = 'y')
-    #fig.set_size_inches(5, 8)
-    # fig.suptitle(f'Track 2d projections',
-    #              fontsize='x-large',
-    #              fontweight='bold')
 
     # cm to mm *10 conversion:
     horStart = [10 * element for element in horStart]
@@ -244,7 +240,10 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
 
 def chi2Hist(chi2_nDfArr, stationNum=0):
-    '''Chi2/nDOF histogram.'''
+    '''
+    Chi2/nDOF histogram.
+    chi2_nDfArr: Array filled with the value for each event.
+    '''
     binsArr = np.linspace(0,40,400)
     fig, ax = plt.subplots(figsize=(8,6), dpi=500, tight_layout=True)
     ax.hist(chi2_nDfArr, bins=binsArr)
@@ -256,7 +255,10 @@ def chi2Hist(chi2_nDfArr, stationNum=0):
     plt.close()
 
 def planesHist(nPlanesHit):
-    '''Historam of number of planes hit.'''
+    '''
+    Historam of number of planes hit.
+    nPlanesHit: Array filled with number of planes hit (0-10) for each event.
+    '''
     fig, ax = plt.subplots(figsize=(5,5), dpi=500, tight_layout=True)
     binsArr = np.linspace(2,11,10)
     ax.hist(nPlanesHit,bins=binsArr)
@@ -268,15 +270,24 @@ def planesHist(nPlanesHit):
 
 
 def gauss(x, A, x0, sigma):
-    ''' Gaussian function.'''
+    '''
+    Gaussian function f(x).
+    Magnitude A, offset x0 and width sigma.
+    '''
     return  A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
 
 def diffHist(horDiffArr, verDiffArr, stationNum):
     '''
     Histogram of position difference between the fit on 4 planes and
     the hit on th 5th one. Gaussian fit.
-    Return [x0, err_x0, sigma, err_sigma] of gaussian fit.
+    horDiffArr, verDiffArr: vertical/horizontal difference between hit and fit,
+    each event gives one element of the array.
+    stationNum: The test station where the difference hit-fit is measured.
+    Return [x0_x, err_x0_x, sigma_x, err_sigma_x, x0_y, err_x0_y, sigma_y, err_sigma_y]
+    of gaussian fit for the full-stations plot.
     '''
+
     # conversion cm in mm *10:
     horDiffArr = [10 * element for element in horDiffArr]
     verDiffArr = [10 * element for element in verDiffArr]
@@ -345,7 +356,9 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
 def allPlanesGauss(fitArr):
     '''
     Global plot for the 5 test stations.
+    fitArr: array of (return format from diffHist()) for each station
     '''
+
     # fitArr already in mm
     stationsArr = [1,2,3,4,5]
     zeroArr = [0,0,0,0,0]
@@ -365,9 +378,6 @@ def allPlanesGauss(fitArr):
         sharex = 'col',
         tight_layout = True)
     fig.set_size_inches(8, 8)
-    # fig.suptitle(f'Difference between hit and fit',
-    #              fontsize='x-large',
-    #              fontweight='bold')
     ax1.errorbar(
         x = stationsArr,
         y = x0_x,
@@ -418,10 +428,20 @@ def allPlanesGauss(fitArr):
     plt.show()
     plt.close()
 
+
 def diffPosHist(posArr, diffArr, binsPos, labels, fileName, isCrossed):
     '''
     Difference fit-hit versus position on plane histogram.
     diffArr, posArr, binsPos must be given in cm, conversion in mm inside function.
+
+    posArr: cluster position, one element of the array for each event.
+    diffArr: difference fit-hit, one element of the array for each event.
+    binsPos: histogram bins for the cluster position. Must set the limits.
+    according to the plane geometry.
+    labels: [xlabel, ylabel] for the axes.
+    fileName: file name without extension, to save the plot.
+    isCrossed: True if X-Y axis are mixed in the same plot to check rotations.
+    Return: slope and its uncertainty for rotation global plot, else None.
     '''
 
     fig, ax = plt.subplots(figsize=(8,6),dpi=500,tight_layout=True)
@@ -433,9 +453,7 @@ def diffPosHist(posArr, diffArr, binsPos, labels, fileName, isCrossed):
     posArr = [10 * element for element in posArr]
     binsPos = [10 * element for element in binsPos]
 
-    # fig.suptitle(f'Residual and position,{verHorStr} test station {testStationNum}.',
-    #          fontsize='large',
-    #          fontweight='bold')
+    # Histogram limits:
     yMin = -2.5
     yMax = 2.5
     xMin = -400
@@ -465,7 +483,6 @@ def diffPosHist(posArr, diffArr, binsPos, labels, fileName, isCrossed):
     if isCrossed:
         linFitModel, cov = np.polyfit(posArr, diffArr, 1,cov = True) # Compute slope and intercept
         linFitFunc = np.poly1d(linFitModel) # Make the line equation
-        print(cov)
         #print(linFitModel)
         ax.plot(
             binx,
@@ -483,6 +500,12 @@ def diffPosHist(posArr, diffArr, binsPos, labels, fileName, isCrossed):
         return linFitModel[0], np.sqrt(cov[0][0]) # Return slope and its uncertainty.
 
 def rotationAngle(xPosyOff_Slope, xPosyOff_SlopeErr, yPosxOff_Slope, yPosxOff_SlopeErr):
+    '''
+    Global rotation plot for each stations, 
+    Use what is returned by diffPosHist().
+    xPosyOff: Cross the X position and the Y offset
+    yPosxOff: Cross the Y position and the X offset
+    '''
     x1 = [0.95, 1.95, 2.95, 3.95, 4.95]
     x2 = [1.05, 2.05, 3.05, 4.05, 5.05]
     zeroes = [0, 0, 0, 0, 0]

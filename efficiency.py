@@ -1,4 +1,4 @@
-# To launch:
+# To launch this script:
 # python3 efficiency.py -p /eos/experiment/sndlhc/testbeam/scifi/sndsw/ -f sndsw_raw_000001.root -g geofile_full.Ntuple-TGeant4.root
 
 # Create a "figures" folder where the script is executed to save them all here.
@@ -9,6 +9,7 @@
 #    - Select events with station hit number, chi2 
 #      or constrained tracks within the detector.
 #    - Fit and display the events.
+#    - Compute the SciFi misalignment, show individual events
 # Uses functions from analysisFunctions.py and plotFunctions.py
 
 # General
@@ -30,9 +31,9 @@ from plotFunctions import (display3dTrack, display2dTrack, chi2Hist,
     planesHist, diffHist, allPlanesGauss, diffPosHist, rotationAngle)
 
 # Script options:
-displayTrack = False # Display 2d/3d track + fit plots of individual events.
-fitReducedStations = True # True to loop 4-fit, 1-test, False to fit with 5 stations.
-needXYInfo = True # both vertical and horizontal planes must be hit (for rotation)
+displayTrack = True # Display 2d/3d track + fit plots of individual events.
+fitReducedStations = False # True to loop 4-fit, 1-test, False to fit with all 5 stations.
+needXYInfo = True # Both vertical and horizontal planes must be hit (for rotation)
 # /!\ Be careful to select 5 stations with goodEvent() if fitReducedStations = True
 
 
@@ -79,21 +80,21 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 # z positions of the planes, array of 10 float
 zArr = zPlaneArr(eventTree = eventTree, geo = geo)
 
-# For rotation plot:
+# For rotation plot to fill with each test station iteration:
 if needXYInfo:
     xPosyOff_Slope = []
     xPosyOff_SlopeErr = []
     yPosxOff_Slope = []
     yPosxOff_SlopeErr = []
 
-
+# Fit on 4 stations and use the 5th one as a test:
 if fitReducedStations:
     gaussFitArr = []
     fitStationsArr = [[2,3,4,5],[1,3,4,5],[1,2,4,5],[1,2,3,5],[1,2,3,4]]
     testStationArr = [1,2,3,4,5]
 else: # Only one loop iteration with all the stations to fit.
     fitStationsArr = [[1,2,3,4,5]]
-    testStationArr =  [0] # Don't exist, but still need for plot names.
+    testStationArr =  [0] # Doesn't exist, but still need for plot names.
 
 for testStationNum in testStationArr:
     chi2_nDfArr = [] # To fill in the loop for histogram
@@ -103,6 +104,7 @@ for testStationNum in testStationArr:
     verDiffArr = []
     horPosArr = []
     verPosArr = []
+
     # Loop over the individual events:
     for sTree in eventTree: # sTree == single tree for one event
         # 1: Select events with given number of stations hit:
@@ -124,9 +126,9 @@ for testStationNum in testStationArr:
                 for index in indexHitArr:
                     # Remove the coordinate of the planes hit,
                     # only the coordinates of the missed hits remains.
-                    # -1.68283565985: Flag to remove the events
-                    hitsMissed[index] = ROOT.TVector3(-1.68283565985,0,0)
-                hitsMissed = [item for item in hitsMissed if item[0] != -1.68283565985]
+                    # -1.12312312312: Flag to remove the events
+                    hitsMissed[index] = ROOT.TVector3(-1.12312312312,0,0)
+                hitsMissed = [item for item in hitsMissed if item[0] != -1.12312312312]
 
                 # Chi2:
                 if fitStatus.getNdf() == 0.0: # Fit has no degree of freedom
@@ -134,29 +136,31 @@ for testStationNum in testStationArr:
                 else: 
                     chi2_nDf = fitStatus.getChi2()/fitStatus.getNdf() 
 
-                # Append for histograms: (nPlanes after chi2 selection?)
+                # Append for histograms: (maybe append after chi2 selection?)
                 chi2_nDfArr.append(chi2_nDf)
                 
 
                 # 3: Select low chi2 tracks: good fit and no secondary events.   
                 # Exception: unhandled, unknown C++ exception" When dof=0, 
-                # also need to filter that (throw chi2_nDf = -1 cases).
+                # also need to filter chi2_nDf = -1 cases.
                 if chi2_nDf<30 and chi2_nDf>=0:
                     nPlanesHit.append(len(indexStationsHit(eventTree)))
                     if fitReducedStations:
                         # Compute difference between hits and fit:
-                        #fitHits = extendHits(fittedTrack=fit, zArr=zArr)
                         horDiff, verDiff, horPos, verPos= distFit(
                             fitHits = fitHitsExt,
                             clusterArr = trackTask.clusters,
                             testStationNum = testStationNum)
+
+                        # Select event if both planes are hit
                         if needXYInfo:
+                            # Search within 1cm from the fit
                             if abs(horDiff) <1 and abs(verDiff) <1:
                                 horDiffArr.append(horDiff)
                                 horPosArr.append(horPos)
                                 verDiffArr.append(verDiff)
                                 verPosArr.append(verPos)
-                        else:
+                        else: # Or at least one plane
                             if horDiff <1: # Don't append missing hits
                                 horDiffArr.append(horDiff)
                                 horPosArr.append(horPos)
@@ -207,8 +211,11 @@ for testStationNum in testStationArr:
             fileName = f'OFFSET_hor_testSta{testStationNum}',
             labels = ['Y cluster position [mm]', 'X offset [mm]'],
             isCrossed = False)
-        if needXYInfo: # If only hit one plane, x and y don't have same dimensions.
-            # Cross terms to check rotations
+
+        # If only hit one plane, x and y don't have same dimensions.
+        # We need the stronger all planes hit condition.
+        if needXYInfo: 
+            # Cross terms to check rotation misalignments
             slope, slopeErr = diffPosHist(
                 posArr = verPosArr,
                 diffArr = horDiffArr,
@@ -230,13 +237,15 @@ for testStationNum in testStationArr:
             yPosxOff_SlopeErr.append(slopeErr)
 
     chi2Hist(chi2_nDfArr=chi2_nDfArr, stationNum=testStationNum)
-    #planesHist(nPlanesHit=nPlanesHit)
-    print(f'Test station: {testStationNum}')
+    #planesHist(nPlanesHit=nPlanesHit) # Show number of planes hit histogram.
+    print(f'Test station: {testStationNum}') # Info of script speed
 
 if fitReducedStations:
+    # Translation misalignment of each station:
     allPlanesGauss(fitArr=gaussFitArr)
 
 if needXYInfo:
+    # Rotation misalignment of each station:
     rotationAngle(
     xPosyOff_Slope = xPosyOff_Slope,
     xPosyOff_SlopeErr = xPosyOff_SlopeErr,
