@@ -31,8 +31,8 @@ from plotFunctions import (display3dTrack, display2dTrack, chi2Hist,
     planesHist, diffHist, allPlanesGauss, diffPosHist, rotationAngle)
 
 # Script options:
-displayTrack = True # Display 2d/3d track + fit plots of individual events.
-fitReducedStations = False # True to loop 4-fit, 1-test, False to fit with all 5 stations.
+displayTrack = False # Display 2d/3d track + fit plots of individual events.
+fitReducedStations = True # True to loop 4-fit, 1-test, False to fit with all 5 stations.
 needXYInfo = True # Both vertical and horizontal planes must be hit (for rotation)
 # /!\ Be careful to select 5 stations with goodEvent() if fitReducedStations = True
 
@@ -202,14 +202,14 @@ for testStationNum in testStationArr:
             diffArr = verDiffArr,
             binsPos = np.linspace(-50,-5,90),
             fileName = f'OFFSET_ver_testSta{testStationNum}',
-            labels = ['X cluster position [mm]', 'X offset [mm]'],
+            labels = ['x residual [mm]', 'x cluster position [mm]'],
             isCrossed = False)
         diffPosHist(
             posArr = horPosArr,
             diffArr = horDiffArr,
             binsPos = np.linspace(15,60,90),
             fileName = f'OFFSET_hor_testSta{testStationNum}',
-            labels = ['Y cluster position [mm]', 'X offset [mm]'],
+            labels = ['y residual [mm]', 'y cluster position [mm]'],
             isCrossed = False)
 
         # If only hit one plane, x and y don't have same dimensions.
@@ -221,7 +221,7 @@ for testStationNum in testStationArr:
                 diffArr = horDiffArr,
                 binsPos = np.linspace(-50,-5,90),
                 fileName = f'ROT_horDiff_verPos_testSta{testStationNum}',
-                labels = ['X cluster position [mm]', 'Y offset [mm]'],
+                labels = ['x cluster position [mm]', 'y residual [mm]'],
                 isCrossed = True)
             xPosyOff_Slope.append(slope)
             xPosyOff_SlopeErr.append(slopeErr)
@@ -231,7 +231,7 @@ for testStationNum in testStationArr:
                 diffArr = verDiffArr,
                 binsPos = np.linspace(15,60,90),
                 fileName = f'ROT_verDiff_horPos_testSta{testStationNum}',
-                labels = ['Y cluster position [mm]', 'X offset [mm]'],
+                labels = ['y cluster position [mm]', 'x residual [mm]'],
                 isCrossed = True)
             yPosxOff_Slope.append(slope)
             yPosxOff_SlopeErr.append(slopeErr)

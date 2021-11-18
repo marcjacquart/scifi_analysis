@@ -172,7 +172,7 @@ def display2dTrack(arrPosStart, arrPosStop, trackTask, fitHits):
 
     fig, (ax1, ax2) = plt.subplots(
         2,
-        figsize = (5,7),
+        figsize = (5,6),
         dpi = 500,
         tight_layout = True)
 
@@ -295,17 +295,17 @@ def diffHist(horDiffArr, verDiffArr, stationNum):
     fig, (ax1, ax2) = plt.subplots(2)
     ax1.grid(axis = 'y')
     ax2.grid(axis = 'y')
-    fig.set_size_inches(8, 8)
+    fig.set_size_inches(8, 6)
     fig.suptitle(f'Difference between hit and fit, test station {stationNum}.',
                  fontsize='x-large',
                  fontweight='bold')
     binsArr = np.linspace(-2.5,2.5,500)
     hist1n, hist1Bins, hist1Patches = ax1.hist(verDiffArr, bins=binsArr)
-    ax1.set_xlabel(r'$\Delta$ x [mm]')
+    ax1.set_xlabel('x residual [mm]')
     ax1.set_ylabel('Number of events')
 
     hist2n, hist2Bins, hist2Patches = ax2.hist(horDiffArr, bins=binsArr)
-    ax2.set_xlabel(r'$\Delta$ y [mm]')
+    ax2.set_xlabel('y residual [mm]')
     ax2.set_ylabel('Number of events')
 
     diff = hist1Bins[1] - hist1Bins[0]
@@ -410,16 +410,16 @@ def allPlanesGauss(fitArr):
         ls = '',
         marker = 'x',
         markeredgecolor = 'k')
-    ax1.set_ylabel('X offset [mm]')
+    ax1.set_ylabel('x offset [mm]')
     ax2.set_ylabel(r'$\sigma_x$ [mm]')
-    ax3.set_ylabel('Y offset [mm]')
+    ax3.set_ylabel('y offset [mm]')
     ax4.set_ylabel(r'$\sigma_y$ [mm]')
     ax2.set_xlabel('Test station')
     ax4.set_xlabel('Test station')
     ax1.set_ylim(bottom = -0.7, top = 0.7)
     ax3.set_ylim(bottom = -0.7, top = 0.7)
-    ax2.set_ylim(bottom = 0.05, top = 0.35)
-    ax4.set_ylim(bottom = 0.05, top = 0.35)
+    ax2.set_ylim(bottom = 0.0, top = 0.35)
+    ax4.set_ylim(bottom = 0.0, top = 0.35)
     ax1.grid()
     ax2.grid()
     ax3.grid()
@@ -522,7 +522,7 @@ def rotationAngle(xPosyOff_Slope, xPosyOff_SlopeErr, yPosxOff_Slope, yPosxOff_Sl
         ls = '',
         marker = 'x',
         markeredgecolor = 'b',
-        label = 'X position, Y offset')
+        label = 'x position, y residual')
 
     ax.errorbar(
         x = x2,
@@ -532,7 +532,7 @@ def rotationAngle(xPosyOff_Slope, xPosyOff_SlopeErr, yPosxOff_Slope, yPosxOff_Sl
         ls = '',
         marker = 'x',
         markeredgecolor = 'r',
-        label = 'Y position, X offset')
+        label = 'y position, x residual')
 
     ax.grid(axis = 'y')
     plt.tick_params(bottom=False)
